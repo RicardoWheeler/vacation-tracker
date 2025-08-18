@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vacation Tracker — New Calendar Vacation Design (08/18/2025)</title>
+    <style>
+      :root[data-theme="light"] {
+        --fedex-purple: #4d148c; /* Vacation */
+        --fedex-orange: #ff6600; /* Sick */
+        --fedex-grey: #a7a9ac; /* Absent */
+        --bg: #f4f4f9;
+        --card: #ffffff;
+        --card-elev: #fbfdff;
+        --text: #222;
+        --muted: #6b7280;
+        --line: rgba(0, 0, 0, 0.1);
+        --name-cell: #4d148c;
+        --chip-text: #fff;
+        --row-selected: rgba(77, 20, 140, 0.08);
+        --sidebar-heading: var(--fedex-purple);
+      }
+      :root[data-theme="dark"] {
+        --fedex-purple: #4d148c;
+        --fedex-orange: #ff6600;
+        --fedex-grey: #9ca3af;
+        --bg: #1c1f27;
+        --card: #2a2f3a;
+        --card-elev: #353b47;
+        --text: #e6ecf5;
+        --muted: #a7b0bd;
+        --line: rgba(255, 255, 255, 0.12);
+        --name-cell: #d1d5db;
+        --chip-text: #111;
+        --row-selected: rgba(255, 255, 255, 0.08);
+        --sidebar-heading: #fff; /* or var(--text) */
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          Helvetica, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+        background: var(--fedex-purple);
+        color: #fff;
+        gap: 10px;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.2;
+      }
+      .controls {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        border: none;
+        border-radius: 6px;
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn-primary {
+        background: var(--fedex-orange);
+        color: #fff;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+      }
+      .btn-outline {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+      .btn-mini {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.45rem;
+        border-radius: 5px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .calendar-wrap {
+        display: flex;
+        gap: 16px;
+        padding: 12px;
+        height: calc(100vh - 60px);
+        align-items: stretch;
+      }
+      .sidebar {
+        flex: 0 0 320px;
+        max-width: 420px;
+        background: var(--card);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        overflow: auto;
+      }
+      .sidebar h2 {
+        margin: 4px 0 8px 0;
+        color: var(--sidebar-heading);
+        font-size: 1.05rem;
+      }
+      .calendar-card {
+        flex: 1 1 auto;
+        background: var(--card);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .month-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+      .month-title {
+        font-weight: 800;
+        font-size: 1rem;
+        margin-right: auto;
+      }
+      .month-nav .btn {
+        padding: 0.35rem 0.6rem;
+      }
+      .weekday-row {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+        margin-bottom: 6px;
+        user-select: none;
+      }
+      .weekday {
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--muted);
+        padding: 0.2rem 0;
+      }
+      .calendar {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+        overflow: auto;
+      }
+      .day {
+        background: var(--card-elev);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        min-height: 100px;
+        padding: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .day.disabled {
+        opacity: 0.35;
+        pointer-events: none;
+      }
+      .day strong {
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 2px 8px;
+        line-height: 1.1;
+        font-size: 0.74rem;
+        color: var(--chip-text);
+        font-weight: 700;
+        box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+      }
+      .chip.vac {
+        background: var(--fedex-purple);
+        color: #fff;
+      }
+      .chip.sick {
+        background: var(--fedex-orange);
+        color: #fff;
+      }
+      .chip.abs {
+        background: var(--fedex-grey);
+        color: #111;
+      }
+      .chip:hover {
+        filter: brightness(0.95);
+      }
+      .summary table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .summary thead th {
+        font-size: 0.82rem;
+        color: var(--muted);
+        font-weight: 700;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        padding: 6px 0;
+      }
+      .summary td {
+        padding: 8px 0;
+        font-size: 0.92rem;
+        border-bottom: 1px dashed var(--line);
+        vertical-align: middle;
+      }
+      td.name-cell {
+        font-weight: 800;
+        color: var(--name-cell);
+        cursor: pointer;
+      }
+      tr.row-selected td {
+        background: var(--row-selected);
+      }
+      .row-actions {
+        display: flex;
+        gap: 6px;
+        justify-content: flex-end;
+      }
+      .kpis {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 6px 0 10px 0;
+      }
+      .kpi {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .dot.v {
+        background: var(--fedex-purple);
+      }
+      .dot.s {
+        background: var(--fedex-orange);
+      }
+      .dot.a {
+        background: var(--fedex-grey);
+      }
+      .inline-input {
+        width: 100%;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--text);
+      }
+      .grid-4 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .grid-4 label {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .fullbtn {
+        width: 100%;
+        margin-top: 6px;
+        background: var(--fedex-orange);
+        color: #fff;
+        border: none;
+        padding: 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 800;
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+      }
+      .modal-content {
+        position: relative;
+        background: var(--card);
+        color: var(--text);
+        width: 380px;
+        max-width: 95vw;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+      }
+      .modal-content h3 {
+        margin: 0 0 8px 0;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .btn-vac {
+        background: var(--fedex-purple);
+        color: #fff;
+      }
+      .btn-sick {
+        background: var(--fedex-orange);
+        color: #fff;
+      }
+      .btn-abs {
+        background: var(--fedex-grey);
+        color: #111;
+      }
+      .btn-cancel {
+        background: var(--muted);
+        color: #000;
+      }
+      .modal-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        background: transparent;
+        border: none;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .stat {
+        border: 1px dashed var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .stat h4 {
+        margin: 0 0 6px 0;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .stat .num {
+        font-size: 1.1rem;
+        font-weight: 800;
+      }
+      @media (max-width: 980px) {
+        .calendar-wrap {
+          flex-direction: column;
+          height: auto;
+        }
+        .sidebar {
+          flex: 0 0 auto;
+          max-width: none;
+        }
+        .calendar-card {
+          min-height: 60vh;
+        }
+      }
+      @media print {
+        body > * {
+          display: none !important;
+        }
+        #printSection,
+        #printMemberSection {
+          display: block !important;
+        }
+        #printSection h2,
+        #printMemberSection h2 {
+          margin: 0 0 10px 0;
+        }
+        .emp-block table,
+        #memberReportTable {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        .emp-block th,
+        .emp-block td,
+        #memberReportTable th,
+        #memberReportTable td {
+          border: 1px solid #000;
+          padding: 6px;
+          font-size: 12px;
+          text-align: left;
+        }
+        .emp-block {
+          page-break-inside: avoid;
+          margin-bottom: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Vacation Tracker</h1>
+      <div class="controls">
+        <button
+          class="btn btn-ghost"
+          id="renameAbsentBtn"
+          title="Rename the 'Absent' category"
+          >Rename “Absent”</button
+        >
+        <button class="btn btn-primary" id="printBtn"
+          >Print Report (Fiscal Year)</button
+        >
+        <button class="btn btn-ghost" id="themeToggle">Toggle Theme</button>
+      </div>
+    </header>
+
+    <div class="calendar-wrap">
+      <aside class="sidebar" aria-label="Team Members">
+        <h2>Team Members</h2>
+
+        <div class="kpis" title="Legend">
+          <span class="kpi"><span class="dot v"></span> Vacation</span>
+          <span class="kpi"><span class="dot s"></span> Sick</span>
+          <span class="kpi"
+            ><span class="dot a"></span>
+            <span id="legendAbsentText">Absent</span></span
+          >
+        </div>
+
+        <div class="summary" aria-label="employee table">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th style="text-align: right">V / S / A (FY used/limit)</th>
+                <th style="text-align: right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="employeeTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Add Employee Form with Fiscal-Year Limits -->
+        <div
+          style="
+            margin-top: 10px;
+            border-top: 1px solid var(--line);
+            padding-top: 10px;
+          "
+        >
+          <label for="newEmployeeName">New employee name</label>
+          <input
+            id="newEmployeeName"
+            class="inline-input"
+            placeholder="e.g., Dana"
+          />
+
+          <div class="grid-4" style="margin-top: 8px">
+            <div>
+              <label for="limitVacFY">Vacation limit (Fiscal Year)</label>
+              <input
+                id="limitVacFY"
+                type="number"
+                class="inline-input"
+                min="0"
+                step="1"
+                placeholder="20"
+              />
+            </div>
+            <div>
+              <label for="limitSickFY">Sick limit (Fiscal Year)</label>
+              <input
+                id="limitSickFY"
+                type="number"
+                class="inline-input"
+                min="0"
+                step="1"
+                placeholder="10"
+              />
+            </div>
+            <div>
+              <label for="limitAbsFY">Absent limit (Fiscal Year)</label>
+              <input
+                id="limitAbsFY"
+                type="number"
+                class="inline-input"
+                min="0"
+                step="1"
+                placeholder="10"
+              />
+            </div>
+          </div>
+
+          <button id="addEmployeeBtn" class="fullbtn">Add Employee</button>
+        </div>
+      </aside>
+
+      <section class="calendar-card">
+        <div class="month-bar">
+          <div class="month-title" id="monthTitle">August 2025</div>
+          <div class="month-nav">
+            <button
+              class="btn btn-outline"
+              id="prevMonthBtn"
+              aria-label="Previous month"
+              >◀</button
+            >
+            <button class="btn btn-outline" id="todayBtn">Today</button>
+            <button
+              class="btn btn-outline"
+              id="nextMonthBtn"
+              aria-label="Next month"
+              >▶</button
+            >
+          </div>
+        </div>
+
+        <div class="weekday-row" aria-hidden="true">
+          <div class="weekday">Sun</div><div class="weekday">Mon</div
+          ><div class="weekday">Tue</div> <div class="weekday">Wed</div
+          ><div class="weekday">Thu</div><div class="weekday">Fri</div
+          ><div class="weekday">Sat</div>
+        </div>
+
+        <div class="calendar" id="calendar" aria-label="Calendar grid"></div>
+      </section>
+    </div>
+
+    <!-- Assignment Modal -->
+    <div
+      id="absenceModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modalTitle"
+    >
+      <div class="modal-content">
+        <button class="modal-close" id="assignModalX" aria-label="Close"
+          >×</button
+        >
+        <h3 id="modalTitle">Assign Day</h3>
+        <div class="modal-actions">
+          <button class="btn btn-vac" id="assignVacation">Vacation</button>
+          <button class="btn btn-sick" id="assignSick">Sick</button>
+          <button class="btn btn-abs" id="assignAbsent">Absent</button>
+          <button class="btn btn-cancel" id="clearDay">Clear</button>
+          <button class="btn btn-ghost" id="closeModal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Member Stats Modal (Fiscal Year) -->
+    <div
+      id="memberModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="memberModalTitle"
+    >
+      <div class="modal-content">
+        <button class="modal-close" id="memberModalX" aria-label="Close"
+          >×</button
+        >
+        <h3 id="memberModalTitle">Member Stats</h3>
+        <div
+          id="memberModalMonth"
+          style="color: var(--muted); font-size: 0.9rem; margin-bottom: 6px"
+        ></div>
+        <div class="stats-grid">
+          <div class="stat"
+            ><h4>Vacation</h4><div class="num" id="msVacUsed">0 used</div
+            ><div class="num" id="msVacRem">0 remaining</div></div
+          >
+          <div class="stat"
+            ><h4>Sick</h4><div class="num" id="msSickUsed">0 used</div
+            ><div class="num" id="msSickRem">0 remaining</div></div
+          >
+          <div class="stat"
+            ><h4 id="msAbsLabel">Absent</h4
+            ><div class="num" id="msAbsUsed">0 used</div
+            ><div class="num" id="msAbsRem">0 remaining</div></div
+          >
+          <div class="stat"
+            ><h4>Total</h4
+            ><div class="num" id="msTotalUsed">0 days used</div></div
+          >
+        </div>
+        <div class="modal-actions" style="margin-top: 12px">
+          <button class="btn btn-primary" id="printMemberBtn"
+            >Print This Member</button
+          >
+          <button class="btn btn-ghost" id="closeMemberModal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Member Modal (Fiscal-Year Limits) -->
+    <div
+      id="editMemberModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="editMemberTitle"
+    >
+      <div class="modal-content">
+        <button class="modal-close" id="editMemberX" aria-label="Close"
+          >×</button
+        >
+        <h3 id="editMemberTitle">Edit Member</h3>
+        <div>
+          <label for="editMemberName">Name</label>
+          <input id="editMemberName" class="inline-input" />
+        </div>
+        <div class="grid-4" style="margin-top: 8px">
+          <div
+            ><label for="editLimitVacFY">Vacation limit (Fiscal Year)</label
+            ><input
+              id="editLimitVacFY"
+              type="number"
+              class="inline-input"
+              min="0"
+              step="1"
+          /></div>
+          <div
+            ><label for="editLimitSickFY">Sick limit (Fiscal Year)</label
+            ><input
+              id="editLimitSickFY"
+              type="number"
+              class="inline-input"
+              min="0"
+              step="1"
+          /></div>
+          <div
+            ><label for="editLimitAbsFY">Absent limit (Fiscal Year)</label
+            ><input
+              id="editLimitAbsFY"
+              type="number"
+              class="inline-input"
+              min="0"
+              step="1"
+          /></div>
+        </div>
+        <small style="color: var(--muted); display: block; margin-top: 6px">
+          Limits apply to the <b>entire fiscal year</b> (Jun 1 → May 31).
+        </small>
+        <div class="modal-actions" style="margin-top: 10px">
+          <button class="btn btn-primary" id="saveEditMember">Save</button>
+          <button class="btn btn-ghost" id="cancelEditMember">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Print Section -->
+    <div id="printSection" style="display: none; padding: 20px">
+      <h2>Absence Report — <span id="printFYTitle"></span></h2>
+      <div id="printEmployeesContainer"></div>
+    </div>
+
+    <!-- Print Member Section -->
+    <div id="printMemberSection" style="display: none; padding: 20px">
+      <h2
+        >Member Absence Report — <span id="printMemberName"></span> —
+        <span id="printMemberFY"></span
+      ></h2>
+      <table id="memberReportTable">
+        <thead>
+          <tr
+            ><th>Category</th><th>Used (FY)</th><th>Remaining (FY)</th
+            ><th>FY Limit</th></tr
+          >
+        </thead>
+        <tbody id="memberReportTBody"></tbody>
+      </table>
+    </div>
+
+    <script>
+      /* THEME */
+      const themeToggleBtn = document.getElementById("themeToggle");
+      function setTheme(t) {
+        document.documentElement.setAttribute("data-theme", t);
+        localStorage.setItem("vac_theme", t);
+      }
+      function toggleTheme() {
+        setTheme(
+          document.documentElement.getAttribute("data-theme") === "dark"
+            ? "light"
+            : "dark"
+        );
+      }
+      themeToggleBtn.addEventListener("click", toggleTheme);
+      setTheme(localStorage.getItem("vac_theme") || "light");
+
+      /* STORAGE HELPERS */
+      const STORAGE_KEY = "vac_tracker_state_v4_fy"; // new key for FY limits
+      function saveState() {
+        const toStore = {
+          employees: state.employees,
+          absentLabel: state.absentLabel,
+          current: state.current,
+          selectedEmployee,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+      }
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return false;
+          const data = JSON.parse(raw);
+          if (data && data.employees) {
+            state.employees = data.employees;
+            if (data.absentLabel) state.absentLabel = data.absentLabel;
+            if (data.current) state.current = data.current;
+            if (data.selectedEmployee) selectedEmployee = data.selectedEmployee;
+            return true;
+          }
+        } catch (e) {
+          console.warn("Load failed", e);
+        }
+        return false;
+      }
+
+      /* STATE */
+      const state = {
+        /* employees[name] = {
+       limitsFY: {vac,sick,abs},      // annual limits
+       months: { 'YYYY-MM': {vac:[],sick:[],abs:[]} }
+     }
+  */
+        employees: {},
+        current: (() => {
+          const d = new Date();
+          return { year: d.getFullYear(), month: d.getMonth() };
+        })(),
+        absentLabel: localStorage.getItem("vac_abs_label") || "Absent",
+      };
+      let selectedEmployee = null;
+
+      /* Defaults (Fiscal-Year) */
+      const DEFAULT_FY_LIMITS = { vac: 20, sick: 10, abs: 10 };
+
+      /* If no FY data yet, seed with 3 members */
+      if (!loadState()) {
+        ["Alice", "Bob", "Charlie"].forEach((n) => {
+          state.employees[n] = {
+            limitsFY: { ...DEFAULT_FY_LIMITS },
+            months: {},
+          };
+        });
+        saveState();
+      }
+
+      /* Helpers: months/dates */
+      function monthKey(y, m) {
+        return `${y}-${String(m + 1).padStart(2, "0")}`;
+      }
+      function ensureMonthData(emp, key) {
+        if (!emp.months[key]) {
+          emp.months[key] = { vac: [], sick: [], abs: [] };
+        }
+        return emp.months[key];
+      }
+      function daysInMonth(y, m) {
+        return new Date(y, m + 1, 0).getDate();
+      }
+      function firstWeekday(y, m) {
+        return new Date(y, m, 1).getDay();
+      }
+      function monthName(y, m) {
+        return (
+          new Date(y, m, 1).toLocaleString(undefined, { month: "long" }) +
+          " " +
+          y
+        );
+      }
+      function monthShortName(i) {
+        return new Date(2000, i, 1).toLocaleString(undefined, {
+          month: "short",
+        });
+      }
+
+      /* Fiscal year helpers (June 1 → May 31) */
+      function fiscalStartYearFor(y, m) {
+        return m >= 5 ? y : y - 1;
+      } // months 0-based; 5=June
+      function fiscalMonths(startYear) {
+        const out = [];
+        for (let mm = 5; mm <= 11; mm++) out.push([startYear, mm]);
+        for (let mm = 0; mm <= 4; mm++) out.push([startYear + 1, mm]);
+        return out;
+      }
+      function fiscalHeader(startYear) {
+        return `Fiscal Year Jun 1, ${startYear} – May 31, ${startYear + 1}`;
+      }
+
+      /* Migration/compat: if an employee has old per-month limits, convert to FY x12 */
+      function getFYLimits(emp) {
+        if (
+          emp.limitsFY &&
+          Number.isFinite(emp.limitsFY.vac) &&
+          Number.isFinite(emp.limitsFY.sick) &&
+          Number.isFinite(emp.limitsFY.abs)
+        ) {
+          return emp.limitsFY;
+        }
+        // legacy: emp.limits (monthly) => convert to FY by *12
+        if (emp.limits) {
+          const converted = {
+            vac: (emp.limits.vac || 0) * 12,
+            sick: (emp.limits.sick || 0) * 12,
+            abs: (emp.limits.abs || 0) * 12,
+          };
+          emp.limitsFY = converted;
+          delete emp.limits; // store forward
+          return converted;
+        }
+        emp.limitsFY = { ...DEFAULT_FY_LIMITS };
+        return emp.limitsFY;
+      }
+
+      /* FY sums using FY limits */
+      function fySums(emp, startYear) {
+        const lim = getFYLimits(emp);
+        let v = 0,
+          s = 0,
+          a = 0;
+        fiscalMonths(startYear).forEach(([yy, mm]) => {
+          const md = ensureMonthData(emp, monthKey(yy, mm));
+          v += md.vac.length;
+          s += md.sick.length;
+          a += md.abs.length;
+        });
+        const used = { v, s, a, total: v + s + a };
+        const remaining = {
+          v: Math.max(0, lim.vac - v),
+          s: Math.max(0, lim.sick - s),
+          a: Math.max(0, lim.abs - a),
+          total: Math.max(0, lim.vac + lim.sick + lim.abs - (v + s + a)),
+        };
+        return { used, limits: lim, remaining };
+      }
+
+      /* ===== Sidebar employees (show FY used/limit) ===== */
+      const employeeBody = document.getElementById("employeeTableBody");
+      function renderEmployees() {
+        employeeBody.innerHTML = "";
+        const y = state.current.year,
+          m = state.current.month,
+          fyStart = fiscalStartYearFor(y, m);
+        Object.keys(state.employees).forEach((name) => {
+          const emp = state.employees[name];
+          const sums = fySums(emp, fyStart);
+          const tr = document.createElement("tr");
+          if (selectedEmployee === name) tr.classList.add("row-selected");
+          tr.innerHTML = `
+      <td class="name-cell" title="Select ${name}">${name}</td>
+      <td style="text-align:right">
+        ${sums.used.v}/${sums.limits.vac} • ${sums.used.s}/${sums.limits.sick} • ${sums.used.a}/${sums.limits.abs}
+      </td>
+      <td class="row-actions" style="text-align:right">
+        <button class="btn-mini edit-btn" title="Edit name & FY limits">Edit</button>
+        <button class="btn-mini del-btn" title="Delete member">Del</button>
+      </td>`;
+          tr.querySelector(".name-cell").addEventListener("click", () => {
+            selectedEmployee = name;
+            renderEmployees();
+            saveState();
+          });
+          tr.querySelector(".edit-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            openEditMember(name);
+          });
+          tr.querySelector(".del-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (!confirm(`Delete ${name}? This will remove their records.`))
+              return;
+            delete state.employees[name];
+            if (selectedEmployee === name) selectedEmployee = null;
+            renderEmployees();
+            renderCalendar();
+            saveState();
+          });
+          employeeBody.appendChild(tr);
+        });
+      }
+
+      /* ===== Add employee (FY limits) ===== */
+      document
+        .getElementById("addEmployeeBtn")
+        .addEventListener("click", () => {
+          const name = document.getElementById("newEmployeeName").value.trim();
+          const v = parseInt(document.getElementById("limitVacFY").value, 10);
+          const s = parseInt(document.getElementById("limitSickFY").value, 10);
+          const a = parseInt(document.getElementById("limitAbsFY").value, 10);
+          if (!name) {
+            alert("Please enter a name.");
+            return;
+          }
+          if (state.employees[name]) {
+            alert("Employee already exists.");
+            return;
+          }
+          const limitsFY = {
+            vac: Number.isFinite(v) ? Math.max(0, v) : DEFAULT_FY_LIMITS.vac,
+            sick: Number.isFinite(s) ? Math.max(0, s) : DEFAULT_FY_LIMITS.sick,
+            abs: Number.isFinite(a) ? Math.max(0, a) : DEFAULT_FY_LIMITS.abs,
+          };
+          state.employees[name] = { limitsFY, months: {} };
+          // seed current month container (optional)
+          ensureMonthData(
+            state.employees[name],
+            monthKey(state.current.year, state.current.month)
+          );
+          // clear inputs
+          document.getElementById("newEmployeeName").value = "";
+          document.getElementById("limitVacFY").value = "";
+          document.getElementById("limitSickFY").value = "";
+          document.getElementById("limitAbsFY").value = "";
+          selectedEmployee = name;
+          renderEmployees();
+          renderCalendar();
+          saveState();
+        });
+
+      /* ===== Calendar render (month-based events, unchanged) ===== */
+      const calEl = document.getElementById("calendar");
+      const monthTitleEl = document.getElementById("monthTitle");
+
+      function renderCalendar() {
+        const y = state.current.year,
+          m = state.current.month,
+          key = monthKey(y, m);
+        monthTitleEl.textContent = monthName(y, m);
+        const dim = daysInMonth(y, m),
+          start = firstWeekday(y, m);
+        calEl.innerHTML = "";
+        for (let i = 0; i < start; i++) {
+          const d = document.createElement("div");
+          d.className = "day disabled";
+          calEl.appendChild(d);
+        }
+        for (let day = 1; day <= dim; day++) {
+          const cell = document.createElement("div");
+          cell.className = "day";
+          cell.dataset.day = day;
+          const chips = document.createElement("div");
+          chips.className = "chips";
+          Object.entries(state.employees).forEach(([name, emp]) => {
+            const md = ensureMonthData(emp, key);
+            if (md.vac.includes(day)) {
+              const c = document.createElement("span");
+              c.className = "chip vac";
+              c.textContent = name;
+              c.title = `${name} — Vacation`;
+              c.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                openMemberModal(name);
+              });
+              chips.appendChild(c);
+            }
+            if (md.sick.includes(day)) {
+              const c = document.createElement("span");
+              c.className = "chip sick";
+              c.textContent = name;
+              c.title = `${name} — Sick`;
+              c.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                openMemberModal(name);
+              });
+              chips.appendChild(c);
+            }
+            if (md.abs.includes(day)) {
+              const c = document.createElement("span");
+              c.className = "chip abs";
+              c.textContent = name;
+              c.title = `${name} — ${state.absentLabel}`;
+              c.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                openMemberModal(name);
+              });
+              chips.appendChild(c);
+            }
+          });
+          cell.innerHTML = `<strong>${day}</strong>`;
+          cell.appendChild(chips);
+          cell.addEventListener("click", () => openAssignModal(day));
+          calEl.appendChild(cell);
+        }
+      }
+
+      /* ===== Month nav ===== */
+      document.getElementById("prevMonthBtn").addEventListener("click", () => {
+        let { year, month } = state.current;
+        month--;
+        if (month < 0) {
+          month = 11;
+          year--;
+        }
+        state.current = { year, month };
+        renderCalendar();
+        renderEmployees();
+        saveState();
+      });
+      document.getElementById("nextMonthBtn").addEventListener("click", () => {
+        let { year, month } = state.current;
+        month++;
+        if (month > 11) {
+          month = 0;
+          year++;
+        }
+        state.current = { year, month };
+        renderCalendar();
+        renderEmployees();
+        saveState();
+      });
+      document.getElementById("todayBtn").addEventListener("click", () => {
+        const d = new Date();
+        state.current = { year: d.getFullYear(), month: d.getMonth() };
+        renderCalendar();
+        renderEmployees();
+        saveState();
+      });
+
+      /* ===== Assign modal ===== */
+      const modal = document.getElementById("absenceModal");
+      const modalTitle = document.getElementById("modalTitle");
+      const assignVacBtn = document.getElementById("assignVacation");
+      const assignSickBtn = document.getElementById("assignSick");
+      const assignAbsBtn = document.getElementById("assignAbsent");
+      const clearBtn = document.getElementById("clearDay");
+      document.getElementById("closeModal").onclick = () =>
+        (modal.style.display = "none");
+      document.getElementById("assignModalX").onclick = () =>
+        (modal.style.display = "none");
+      let selectedDay = null;
+
+      function openAssignModal(day) {
+        if (!selectedEmployee) {
+          alert(
+            "Please select an employee first (click their name in the left panel)."
+          );
+          return;
+        }
+        selectedDay = day;
+        modalTitle.textContent = `Assign ${selectedEmployee} — ${monthTitleEl.textContent} ${day}`;
+        assignAbsBtn.textContent = state.absentLabel;
+        modal.style.display = "flex";
+      }
+      function assignDay(kind) {
+        const key = monthKey(state.current.year, state.current.month);
+        const emp = state.employees[selectedEmployee];
+        const md = ensureMonthData(emp, key);
+        md.vac = md.vac.filter((d) => d !== selectedDay);
+        md.sick = md.sick.filter((d) => d !== selectedDay);
+        md.abs = md.abs.filter((d) => d !== selectedDay);
+        md[kind].push(selectedDay);
+        md[kind].sort((a, b) => a - b);
+        modal.style.display = "none";
+        renderCalendar();
+        renderEmployees();
+        saveState();
+      }
+      assignVacBtn.onclick = () => assignDay("vac");
+      assignSickBtn.onclick = () => assignDay("sick");
+      assignAbsBtn.onclick = () => assignDay("abs");
+      clearBtn.onclick = () => {
+        const key = monthKey(state.current.year, state.current.month);
+        const emp = state.employees[selectedEmployee];
+        const md = ensureMonthData(emp, key);
+        md.vac = md.vac.filter((d) => d !== selectedDay);
+        md.sick = md.sick.filter((d) => d !== selectedDay);
+        md.abs = md.abs.filter((d) => d !== selectedDay);
+        modal.style.display = "none";
+        renderCalendar();
+        renderEmployees();
+        saveState();
+      };
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          modal.style.display = "none";
+          memberModal.style.display = "none";
+          editMemberModal.style.display = "none";
+        }
+      });
+      window.addEventListener("click", (e) => {
+        if (e.target === modal) modal.style.display = "none";
+        if (e.target === memberModal) memberModal.style.display = "none";
+        if (e.target === editMemberModal)
+          editMemberModal.style.display = "none";
+      });
+
+      /* ===== Rename Absent ===== */
+      const renameAbsentBtn = document.getElementById("renameAbsentBtn");
+      const legendAbsentText = document.getElementById("legendAbsentText");
+      function applyAbsentLabel() {
+        legendAbsentText.textContent = state.absentLabel;
+        document.getElementById("msAbsLabel").textContent = state.absentLabel;
+      }
+      applyAbsentLabel();
+      renameAbsentBtn.addEventListener("click", () => {
+        const val = prompt(
+          "Enter a new name for the “Absent” category:",
+          state.absentLabel
+        );
+        if (!val) return;
+        state.absentLabel = val.trim() || "Absent";
+        localStorage.setItem("vac_abs_label", state.absentLabel);
+        applyAbsentLabel();
+        assignAbsBtn.textContent = state.absentLabel;
+        saveState();
+      });
+
+      /* ===== Member modal — Fiscal Year totals/remaining ===== */
+      const memberModal = document.getElementById("memberModal");
+      const memberModalTitle = document.getElementById("memberModalTitle");
+      const memberModalMonth = document.getElementById("memberModalMonth");
+      const msVacUsed = document.getElementById("msVacUsed");
+      const msVacRem = document.getElementById("msVacRem");
+      const msSickUsed = document.getElementById("msSickUsed");
+      const msSickRem = document.getElementById("msSickRem");
+      const msAbsUsed = document.getElementById("msAbsUsed");
+      const msAbsRem = document.getElementById("msAbsRem");
+      const msTotalUsed = document.getElementById("msTotalUsed");
+      const closeMemberModal = document.getElementById("closeMemberModal");
+      const printMemberBtn = document.getElementById("printMemberBtn");
+      const memberModalX = document.getElementById("memberModalX");
+      let memberModalCurrentName = null;
+
+      function openMemberModal(name) {
+        const y = state.current.year,
+          m = state.current.month;
+        const fyStart = fiscalStartYearFor(y, m);
+        const emp = state.employees[name];
+        const sums = fySums(emp, fyStart);
+
+        memberModalCurrentName = name;
+        memberModalTitle.textContent = `Member Stats — ${name}`;
+        memberModalMonth.textContent = fiscalHeader(fyStart);
+
+        msVacUsed.textContent = `${sums.used.v} used (FY)`;
+        msVacRem.textContent = `${sums.remaining.v} remaining (FY)`;
+        msSickUsed.textContent = `${sums.used.s} used (FY)`;
+        msSickRem.textContent = `${sums.remaining.s} remaining (FY)`;
+        msAbsUsed.textContent = `${sums.used.a} used (FY)`;
+        msAbsRem.textContent = `${sums.remaining.a} remaining (FY)`;
+        msTotalUsed.textContent = `${sums.used.total} days used (FY)`;
+
+        memberModal.style.display = "flex";
+      }
+      closeMemberModal.addEventListener(
+        "click",
+        () => (memberModal.style.display = "none")
+      );
+      memberModalX.addEventListener(
+        "click",
+        () => (memberModal.style.display = "none")
+      );
+
+      /* ===== Print member (FY) ===== */
+      const printMemberSection = document.getElementById("printMemberSection");
+      const printMemberNameEl = document.getElementById("printMemberName");
+      const printMemberFYEl = document.getElementById("printMemberFY");
+      const memberReportTBody = document.getElementById("memberReportTBody");
+      printMemberBtn.addEventListener("click", () => {
+        if (!memberModalCurrentName) return;
+        const name = memberModalCurrentName,
+          y = state.current.year,
+          m = state.current.month;
+        const fyStart = fiscalStartYearFor(y, m);
+        const emp = state.employees[name];
+        const sums = fySums(emp, fyStart);
+
+        memberReportTBody.innerHTML = "";
+        printMemberNameEl.textContent = name;
+        printMemberFYEl.textContent = fiscalHeader(fyStart);
+
+        const rows = [
+          {
+            label: "Vacation",
+            used: sums.used.v,
+            rem: sums.remaining.v,
+            limit: sums.limits.vac,
+          },
+          {
+            label: "Sick",
+            used: sums.used.s,
+            rem: sums.remaining.s,
+            limit: sums.limits.sick,
+          },
+          {
+            label: state.absentLabel,
+            used: sums.used.a,
+            rem: sums.remaining.a,
+            limit: sums.limits.abs,
+          },
+        ];
+        rows.forEach((r) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${r.label}</td><td>${r.used}</td><td>${r.rem}</td><td>${r.limit}</td>`;
+          memberReportTBody.appendChild(tr);
+        });
+        document.getElementById("printSection").style.display = "none";
+        printMemberSection.style.display = "block";
+        window.print();
+        printMemberSection.style.display = "none";
+      });
+
+      /* ===== Edit member (FY limits) ===== */
+      const editMemberModal = document.getElementById("editMemberModal");
+      const editMemberX = document.getElementById("editMemberX");
+      const editMemberName = document.getElementById("editMemberName");
+      const editLimitVacFY = document.getElementById("editLimitVacFY");
+      const editLimitSickFY = document.getElementById("editLimitSickFY");
+      const editLimitAbsFY = document.getElementById("editLimitAbsFY");
+      const saveEditMember = document.getElementById("saveEditMember");
+      const cancelEditMember = document.getElementById("cancelEditMember");
+      let editMemberOriginalName = null;
+
+      function openEditMember(name) {
+        editMemberOriginalName = name;
+        const emp = state.employees[name];
+        const lim = getFYLimits(emp);
+        editMemberName.value = name;
+        editLimitVacFY.value = lim.vac;
+        editLimitSickFY.value = lim.sick;
+        editLimitAbsFY.value = lim.abs;
+        editMemberModal.style.display = "flex";
+      }
+      saveEditMember.addEventListener("click", () => {
+        const newName = editMemberName.value.trim();
+        const v = parseInt(editLimitVacFY.value, 10);
+        const s = parseInt(editLimitSickFY.value, 10);
+        const a = parseInt(editLimitAbsFY.value, 10);
+        if (!newName) {
+          alert("Please enter a name.");
+          return;
+        }
+        const limFY = {
+          vac: Number.isFinite(v) ? Math.max(0, v) : DEFAULT_FY_LIMITS.vac,
+          sick: Number.isFinite(s) ? Math.max(0, s) : DEFAULT_FY_LIMITS.sick,
+          abs: Number.isFinite(a) ? Math.max(0, a) : DEFAULT_FY_LIMITS.abs,
+        };
+        if (newName !== editMemberOriginalName) {
+          if (state.employees[newName]) {
+            alert("A member with that name already exists.");
+            return;
+          }
+          state.employees[newName] = state.employees[editMemberOriginalName];
+          delete state.employees[editMemberOriginalName];
+          if (selectedEmployee === editMemberOriginalName)
+            selectedEmployee = newName;
+        }
+        const emp = state.employees[newName];
+        emp.limitsFY = limFY; // store annual limits
+
+        editMemberModal.style.display = "none";
+        renderEmployees();
+        renderCalendar();
+        saveState();
+      });
+      cancelEditMember.addEventListener(
+        "click",
+        () => (editMemberModal.style.display = "none")
+      );
+      editMemberX.addEventListener(
+        "click",
+        () => (editMemberModal.style.display = "none")
+      );
+
+      /* ===== Print report (Fiscal Year) ===== */
+      const printBtn = document.getElementById("printBtn");
+      const printFYTitle = document.getElementById("printFYTitle");
+      const printEmployeesContainer = document.getElementById(
+        "printEmployeesContainer"
+      );
+
+      function buildEmployeeFYBlock(name, fyStartYear) {
+        const emp = state.employees[name];
+        const rows = [];
+        fiscalMonths(fyStartYear).forEach(([yy, mm]) => {
+          const md = ensureMonthData(emp, monthKey(yy, mm));
+          const v = md.vac.length,
+            s = md.sick.length,
+            a = md.abs.length;
+          rows.push({
+            label: `${monthShortName(mm)} ${String(yy).slice(-2)}`,
+            v,
+            s,
+            a,
+            total: v + s + a,
+          });
+        });
+        const sums = fySums(emp, fyStartYear);
+        const wrap = document.createElement("div");
+        wrap.className = "emp-block";
+        wrap.innerHTML = `
+    <h3 style="margin:10px 0 6px 0">${name} — ${fiscalHeader(fyStartYear)}</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Vacation</th>
+          <th>Sick</th>
+          <th>${state.absentLabel}</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (r) => `<tr>
+          <td>${r.label}</td>
+          <td>${r.v}</td>
+          <td>${r.s}</td>
+          <td>${r.a}</td>
+          <td>${r.total}</td>
+        </tr>`
+          )
+          .join("")}
+        <tr>
+          <th>Fiscal Year Total</th>
+          <th>${sums.used.v}</th>
+          <th>${sums.used.s}</th>
+          <th>${sums.used.a}</th>
+          <th>${sums.used.total}</th>
+        </tr>
+        <tr>
+          <th>Remaining (FY)</th>
+          <th>${sums.remaining.v}</th>
+          <th>${sums.remaining.s}</th>
+          <th>${sums.remaining.a}</th>
+          <th>${sums.remaining.total}</th>
+        </tr>
+        <tr>
+          <th>FY Limits</th>
+          <th>${sums.limits.vac}</th>
+          <th>${sums.limits.sick}</th>
+          <th>${sums.limits.abs}</th>
+          <th>${sums.limits.vac + sums.limits.sick + sums.limits.abs}</th>
+        </tr>
+      </tbody>
+    </table>
+  `;
+        return wrap;
+      }
+
+      printBtn.addEventListener("click", () => {
+        const y = state.current.year,
+          m = state.current.month;
+        const fyStart = fiscalStartYearFor(y, m);
+        printFYTitle.textContent = fiscalHeader(fyStart);
+        printEmployeesContainer.innerHTML = "";
+        Object.keys(state.employees).forEach((name) => {
+          printEmployeesContainer.appendChild(
+            buildEmployeeFYBlock(name, fyStart)
+          );
+        });
+        document.getElementById("printMemberSection").style.display = "none";
+        document.getElementById("printSection").style.display = "block";
+        window.print();
+        document.getElementById("printSection").style.display = "none";
+      });
+
+      /* INIT */
+      function boot() {
+        document.title = "Vacation Tracker";
+        applyAbsentLabel();
+        renderEmployees();
+        renderCalendar();
+      }
+      boot();
+    </script>
+  </body>
+</html>
