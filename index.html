@@ -1393,6 +1393,84 @@
         renderCalendar();
       }
       boot();
+/** === GitHub auto-sync (drop-in) ===
+ * Paste this block AFTER your app's main <script> so it can wrap saveState().
+ * It will POST your state to the Vercel API on every change (debounced).
+ */
+const SYNC_ENDPOINT = 'https://vacation-tracker-api.vercel.app/api/state'; // ← your Vercel API URL
+const STORAGE_KEY   = 'vac_tracker_state_v4_fy';         // must match your app's key
+const SYNC_ID_KEY   = 'vac_tracker_user_id';             // anonymous per-browser id
+const SYNC_DEBOUNCE_MS = 800;
+
+function getOrCreateUserId(){
+  let id = localStorage.getItem(SYNC_ID_KEY);
+  if (!id) { id = 'u_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+             localStorage.setItem(SYNC_ID_KEY, id); }
+  return id;
+}
+const USER_ID = getOrCreateUserId();
+
+let syncTimer=null;
+function queueSync(){ clearTimeout(syncTimer); syncTimer = setTimeout(pushToGitHub, SYNC_DEBOUNCE_MS); }
+
+async function pushToGitHub(){
+  try{
+    // Build the latest state payload (prefer your in-memory state if available)
+    let data;
+    if (typeof state === 'object') {
+      data = {
+        employees: state.employees,
+        absentLabel: state.absentLabel,
+        current: state.current,
+        selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
+        updatedAt: Date.now()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } else {
+      // fallback: read whatever is in localStorage
+      data = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      data.updatedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    await fetch(`${SYNC_ENDPOINT}?key=${encodeURIComponent(USER_ID)}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ data, commitMessage: 'Auto-sync from app' })
+    });
+    // (optional) console.log('Synced to GitHub');
+  } catch (e) {
+    console.warn('Sync failed', e);
+  }
+}
+
+// Wrap your existing saveState() so every change triggers a sync
+const _origSaveState = window.saveState || function(){};
+window.saveState = function(...args){
+  try {
+    // Make sure localStorage is updated (your app usually does this already)
+    if (typeof state === 'object') {
+      const toStore = {
+        employees: state.employees,
+        absentLabel: state.absentLabel,
+        current: state.current,
+        selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
+        updatedAt: Date.now()
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+    }
+  } catch {}
+
+  // Call the original behavior (if any)
+  try { _origSaveState.apply(this, args); } catch {}
+
+  // Debounced push to GitHub
+  queueSync();
+};
+
+// Optional: first-time push so the file gets created even if user hasn't changed anything yet
+window.addEventListener('load', ()=> queueSync());
     </script>
   </body>
 </html>
+
