@@ -1405,12 +1405,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const STORAGE_KEY = 'vac_tracker_state_v4_fy';   // your existing key
-const SYNC_ID_KEY = 'vac_tracker_user_id';       // existing per-browser id
-const USER_ID = localStorage.getItem(SYNC_ID_KEY) || (() => {
-  const id = 'u_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-  localStorage.setItem(SYNC_ID_KEY, id);
-  return id;
-})();
+const USER_ID = 'team-global'; // everyone uses the same row in vac_state
 
 // Pull latest from cloud on load (prefer newest by updatedAt)
 async function pullFromCloud(){
@@ -1482,6 +1477,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   </body>
 </html>
+
 
 
 
