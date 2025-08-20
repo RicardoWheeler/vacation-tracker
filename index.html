@@ -1404,8 +1404,8 @@ const SUPABASE_URL = 'https://hazsbrxtlpelvahrnvej.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhenNicnh0bHBlbHZhaHJudmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1NzUwNDQsImV4cCI6MjA3MTE1MTA0NH0.ayUb40bbzsgcUuau3heNcxJeSyRCmeP1yJW3lrk96Do';
 const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-const STORAGE_KEY = 'vac_tracker_state_v4_fy';   // your existing key
-const USER_ID = 'team-global'; // everyone uses the same row in vac_state
+const LS_KEY = 'vac_tracker_state_v4_fy';   // reuse your existing localStorage key
+const USER_ID = 'team-global';              // shared row so all PCs see the same data
 
 // Pull latest from cloud on load (prefer newest by updatedAt)
 async function pullFromCloud(){
@@ -1477,6 +1477,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   </body>
 </html>
+
 
 
 
