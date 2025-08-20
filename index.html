@@ -311,9 +311,8 @@
           const data = JSON.parse(raw);
           if (data && data.employees){
             state.employees = data.employees;
-            state.employeeOrder = Array.isArray(data.employeeOrder)
-              ? data.employeeOrder
-              : Object.keys(state.employees);
+            // FIX: do not rebuild with Object.keys; if missing, use []
+            state.employeeOrder = Array.isArray(data.employeeOrder) ? data.employeeOrder : [];
             if (data.absentLabel) state.absentLabel = data.absentLabel;
             if (data.current)      state.current = data.current;
             if (data.selectedEmployee) selectedEmployee = data.selectedEmployee;
@@ -337,8 +336,9 @@
 
       /* If no FY data yet, seed with 3 members */
       if (!loadState()){
-        ["Alice","Bob","Charlie"].forEach(n=>{
-          state.employees[n] = { limitsFY: { ...DEFAULT_FY_LIMITS }, months: {} };
+        const now = Date.now();
+        ["Alice","Bob","Charlie"].forEach((n,i)=>{
+          state.employees[n] = { limitsFY: { ...DEFAULT_FY_LIMITS }, months: {}, meta:{ createdAt: now + i } };
         });
         state.employeeOrder = ["Alice","Bob","Charlie"];
         saveState();
@@ -373,12 +373,16 @@
         return { used, limits:lim, remaining };
       }
 
-      /* Keep & use insertion order */
+      /* Keep & use insertion order — FIXED to avoid rebuilding from Object.keys */
       function ensureOrderIntegrity() {
-        state.employeeOrder = (state.employeeOrder || []).filter(n => state.employees[n]);
-        for (const n of Object.keys(state.employees)) {
-          if (!state.employeeOrder.includes(n)) state.employeeOrder.push(n);
+        const current = Array.isArray(state.employeeOrder) ? state.employeeOrder : [];
+        // 1) Keep only names that still exist
+        const filtered = current.filter(n => state.employees[n]);
+        // 2) Append any brand-new names not yet tracked
+        for (const n in state.employees) {
+          if (!filtered.includes(n)) filtered.push(n);
         }
+        state.employeeOrder = filtered;
       }
       function getOrderedNames() {
         ensureOrderIntegrity();
@@ -412,7 +416,7 @@
         });
       }
 
-      /* Add employee (FY limits) */
+      /* Add employee (FY limits) — add createdAt for deterministic recovery */
       document.getElementById("addEmployeeBtn").addEventListener("click",()=>{
         const name=document.getElementById("newEmployeeName").value.trim();
         const v=parseInt(document.getElementById("limitVacFY").value,10);
@@ -421,7 +425,7 @@
         if(!name){ alert("Please enter a name."); return; }
         if(state.employees[name]){ alert("Employee already exists."); return; }
         const limitsFY={ vac:Number.isFinite(v)?Math.max(0,v):DEFAULT_FY_LIMITS.vac, sick:Number.isFinite(s)?Math.max(0,s):DEFAULT_FY_LIMITS.sick, abs:Number.isFinite(a)?Math.max(0,a):DEFAULT_FY_LIMITS.abs };
-        state.employees[name]={ limitsFY, months:{} };
+        state.employees[name]={ limitsFY, months:{}, meta:{ createdAt: Date.now() } };
         state.employeeOrder.push(name);   // maintain order
         ensureMonthData(state.employees[name], monthKey(state.current.year, state.current.month));
         document.getElementById("newEmployeeName").value="";
@@ -658,9 +662,8 @@
         if (rt > lt){
           // hydrate state
           if (remote.employees) state.employees = remote.employees;
-          state.employeeOrder = Array.isArray(remote.employeeOrder)
-            ? remote.employeeOrder
-            : Object.keys(state.employees);
+          // FIX: never rebuild with Object.keys; if missing, keep existing
+          state.employeeOrder = Array.isArray(remote.employeeOrder) ? remote.employeeOrder : state.employeeOrder;
           if (remote.absentLabel) state.absentLabel = remote.absentLabel;
           if (remote.current) state.current = remote.current;
           if ('selectedEmployee' in remote) selectedEmployee = remote.selectedEmployee;
@@ -688,12 +691,13 @@
         if (error) console.warn('[push] error', error);
       }
 
+      // FIX: Make this the single source of truth; do NOT call the original (which lacked updatedAt)
       const _origSaveStateCloud = window.saveState || function(){};
       window.saveState = function(...args){
         try{
           const toStore = {
             employees: state.employees,
-            employeeOrder: state.employeeOrder,   // keep order locally too
+            employeeOrder: state.employeeOrder,
             absentLabel: state.absentLabel,
             current: state.current,
             selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
@@ -701,7 +705,7 @@
           };
           localStorage.setItem(LS_KEY, JSON.stringify(toStore));
         }catch{}
-        try{ _origSaveStateCloud.apply(this, args); }catch{}
+        // Do NOT call _origSaveStateCloud; it would overwrite without updatedAt
         queueCloudSync();
       };
 
@@ -713,6 +717,8 @@
     </script>
   </body>
 </html>
+
+
 
 
 
