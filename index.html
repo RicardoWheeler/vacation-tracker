@@ -296,7 +296,13 @@
       /* STORAGE HELPERS */
       const STORAGE_KEY = "vac_tracker_state_v4_fy"; // FY key
       function saveState(){
-        const toStore = { employees: state.employees, absentLabel: state.absentLabel, current: state.current, selectedEmployee };
+        const toStore = {
+          employees: state.employees,
+          employeeOrder: state.employeeOrder,   // order persisted
+          absentLabel: state.absentLabel,
+          current: state.current,
+          selectedEmployee,
+        };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
       }
       function loadState(){
@@ -305,6 +311,9 @@
           const data = JSON.parse(raw);
           if (data && data.employees){
             state.employees = data.employees;
+            state.employeeOrder = Array.isArray(data.employeeOrder)
+              ? data.employeeOrder
+              : Object.keys(state.employees);
             if (data.absentLabel) state.absentLabel = data.absentLabel;
             if (data.current)      state.current = data.current;
             if (data.selectedEmployee) selectedEmployee = data.selectedEmployee;
@@ -317,6 +326,7 @@
       /* STATE */
       const state = {
         employees:{},
+        employeeOrder: [],   // preserves entry order
         current:(()=>{ const d=new Date(); return { year:d.getFullYear(), month:d.getMonth() }; })(),
         absentLabel: localStorage.getItem("vac_abs_label") || "Absent",
       };
@@ -330,6 +340,7 @@
         ["Alice","Bob","Charlie"].forEach(n=>{
           state.employees[n] = { limitsFY: { ...DEFAULT_FY_LIMITS }, months: {} };
         });
+        state.employeeOrder = ["Alice","Bob","Charlie"];
         saveState();
       }
 
@@ -362,12 +373,24 @@
         return { used, limits:lim, remaining };
       }
 
+      /* Keep & use insertion order */
+      function ensureOrderIntegrity() {
+        state.employeeOrder = (state.employeeOrder || []).filter(n => state.employees[n]);
+        for (const n of Object.keys(state.employees)) {
+          if (!state.employeeOrder.includes(n)) state.employeeOrder.push(n);
+        }
+      }
+      function getOrderedNames() {
+        ensureOrderIntegrity();
+        return state.employeeOrder.slice();
+      }
+
       /* Sidebar employees (FY used/limit) */
       const employeeBody=document.getElementById("employeeTableBody");
       function renderEmployees(){
         employeeBody.innerHTML="";
         const {year:y, month:m}=state.current, fyStart=fiscalStartYearFor(y,m);
-        Object.keys(state.employees).forEach(name=>{
+        getOrderedNames().forEach(name=>{
           const emp=state.employees[name]; const sums=fySums(emp,fyStart);
           const tr=document.createElement("tr"); if (selectedEmployee===name) tr.classList.add("row-selected");
           tr.innerHTML=`
@@ -379,7 +402,12 @@
             </td>`;
           tr.querySelector(".name-cell").addEventListener("click",()=>{ selectedEmployee=name; renderEmployees(); saveState(); });
           tr.querySelector(".edit-btn").addEventListener("click",(e)=>{ e.stopPropagation(); openEditMember(name); });
-          tr.querySelector(".del-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(!confirm(`Delete ${name}? This will remove their records.`)) return; delete state.employees[name]; if(selectedEmployee===name) selectedEmployee=null; renderEmployees(); renderCalendar(); saveState(); });
+          tr.querySelector(".del-btn").addEventListener("click",(e)=>{ e.stopPropagation(); if(!confirm(`Delete ${name}? This will remove their records.`)) return;
+            delete state.employees[name];
+            state.employeeOrder = state.employeeOrder.filter(n => n !== name);  // keep order in sync
+            if(selectedEmployee===name) selectedEmployee=null;
+            renderEmployees(); renderCalendar(); saveState();
+          });
           employeeBody.appendChild(tr);
         });
       }
@@ -394,6 +422,7 @@
         if(state.employees[name]){ alert("Employee already exists."); return; }
         const limitsFY={ vac:Number.isFinite(v)?Math.max(0,v):DEFAULT_FY_LIMITS.vac, sick:Number.isFinite(s)?Math.max(0,s):DEFAULT_FY_LIMITS.sick, abs:Number.isFinite(a)?Math.max(0,a):DEFAULT_FY_LIMITS.abs };
         state.employees[name]={ limitsFY, months:{} };
+        state.employeeOrder.push(name);   // maintain order
         ensureMonthData(state.employees[name], monthKey(state.current.year, state.current.month));
         document.getElementById("newEmployeeName").value="";
         document.getElementById("limitVacFY").value="";
@@ -414,7 +443,8 @@
         for(let day=1; day<=dim; day++){
           const cell=document.createElement("div"); cell.className="day"; cell.dataset.day=day;
           const chips=document.createElement("div"); chips.className="chips";
-          Object.entries(state.employees).forEach(([name,emp])=>{
+          getOrderedNames().forEach((name)=>{
+            const emp = state.employees[name];
             const md=ensureMonthData(emp,key);
             if(md.vac.includes(day)){ const c=document.createElement("span"); c.className="chip vac";  c.textContent=name; c.title=`${name} — Vacation`; c.addEventListener("click",(ev)=>{ev.stopPropagation(); openMemberModal(name);}); chips.appendChild(c); }
             if(md.sick.includes(day)){const c=document.createElement("span"); c.className="chip sick"; c.textContent=name; c.title=`${name} — Sick`;     c.addEventListener("click",(ev)=>{ev.stopPropagation(); openMemberModal(name);}); chips.appendChild(c); }
@@ -552,8 +582,12 @@
         const limFY={ vac:Number.isFinite(v)?Math.max(0,v):DEFAULT_FY_LIMITS.vac, sick:Number.isFinite(s)?Math.max(0,s):DEFAULT_FY_LIMITS.sick, abs:Number.isFinite(a)?Math.max(0,a):DEFAULT_FY_LIMITS.abs };
         if(newName!==editMemberOriginalName){
           if(state.employees[newName]){ alert("A member with that name already exists."); return; }
-          state.employees[newName]=state.employees[editMemberOriginalName]; delete state.employees[editMemberOriginalName];
+          state.employees[newName]=state.employees[editMemberOriginalName];
+          delete state.employees[editMemberOriginalName];
           if(selectedEmployee===editMemberOriginalName) selectedEmployee=newName;
+          // update order in-place
+          const i = state.employeeOrder.indexOf(editMemberOriginalName);
+          if (i !== -1) state.employeeOrder.splice(i, 1, newName);
         }
         const emp=state.employees[newName]; emp.limitsFY=limFY;
         editMemberModal.style.display="none"; renderEmployees(); renderCalendar(); saveState();
@@ -590,12 +624,12 @@
       printBtn.addEventListener("click",()=>{
         const {year:y,month:m}=state.current; const fyStart=fiscalStartYearFor(y,m);
         printFYTitle.textContent=fiscalHeader(fyStart); printEmployeesContainer.innerHTML="";
-        Object.keys(state.employees).forEach(name=>{ printEmployeesContainer.appendChild(buildEmployeeFYBlock(name, fyStart)); });
+        getOrderedNames().forEach(name=>{ printEmployeesContainer.appendChild(buildEmployeeFYBlock(name, fyStart)); });
         document.getElementById("printMemberSection").style.display="none"; document.getElementById("printSection").style.display="block"; window.print(); document.getElementById("printSection").style.display="none";
       });
 
       /* INIT */
-      function boot(){ document.title="Vacation Tracker"; applyAbsentLabel(); renderEmployees(); renderCalendar(); }
+      function boot(){ document.title="Vacation Tracker"; applyAbsentLabel(); ensureOrderIntegrity(); renderEmployees(); renderCalendar(); }
       boot(); /* keep initial render; Supabase will pull and rehydrate if newer */
     </script>
 
@@ -622,11 +656,17 @@
         const local  = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
         const lt = local?.updatedAt || 0, rt = remote?.updatedAt || 0;
         if (rt > lt){
-          localStorage.setItem(LS_KEY, JSON.stringify(remote));
+          // hydrate state
           if (remote.employees) state.employees = remote.employees;
+          state.employeeOrder = Array.isArray(remote.employeeOrder)
+            ? remote.employeeOrder
+            : Object.keys(state.employees);
           if (remote.absentLabel) state.absentLabel = remote.absentLabel;
           if (remote.current) state.current = remote.current;
           if ('selectedEmployee' in remote) selectedEmployee = remote.selectedEmployee;
+
+          // write the exact remote payload (keeps employeeOrder)
+          localStorage.setItem(LS_KEY, JSON.stringify(remote));
           renderEmployees(); renderCalendar();
         }
       }
@@ -637,6 +677,7 @@
       async function pushToCloud(){
         const payload = {
           employees: state.employees,
+          employeeOrder: state.employeeOrder,  // keep order in cloud
           absentLabel: state.absentLabel,
           current: state.current,
           selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
@@ -652,6 +693,7 @@
         try{
           const toStore = {
             employees: state.employees,
+            employeeOrder: state.employeeOrder,   // keep order locally too
             absentLabel: state.absentLabel,
             current: state.current,
             selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
@@ -665,12 +707,15 @@
 
       document.addEventListener('DOMContentLoaded', async ()=>{
         await pullFromCloud();
-        /* boot() already ran above; just ensure a row exists remotely */
+        /* ensure a row exists remotely */
         queueCloudSync();
       });
     </script>
   </body>
 </html>
+
+
+
 
 
 
