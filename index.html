@@ -2140,93 +2140,160 @@
       });
     </script>
 
-    <!-- Supabase Sync -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-      const SUPABASE_URL = "https://hazsbrxtlpelvahrnvej.supabase.co";
-      const SUPABASE_ANON =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhenNicnh0bHBlbHZhaHJudmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1NzUwNDQsImV4cCI6MjA3MTE1MTA0NH0.ayUb40bbzsgcUuau3heNcxJeSyRCmeP1yJW3lrk96Do";
-      const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-      const LS_KEY = STORAGE_KEY;
-      const USER_ID = "team-global";
+<!-- Supabase Sync (safe compare-and-swap) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = 'https://hazsbrxtlpelvahrnvej.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhenNicnh0bHBlbHZhaHJudmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1NzUwNDQsImV4cCI6MjA3MTE1MTA0NH0.ayUb40bbzsgcUuau3heNcxJeSyRCmeP1yJW3lrk96Do';
+  const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-      async function pullFromCloud() {
-        const { data, error } = await supa
-          .from("vac_state")
-          .select("data,updated_at")
-          .eq("id", USER_ID)
-          .maybeSingle();
-        if (error) {
-          console.warn("[pull] error", error);
-          return;
-        }
-        if (!data) return;
-        const remote = data.data;
-        const local = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
-        const lt = local?.updatedAt || 0,
-          rt = remote?.updatedAt || 0;
-        if (rt > lt) {
-          if (remote.employees) state.employees = remote.employees;
-          state.employeeOrder = Array.isArray(remote.employeeOrder)
-            ? remote.employeeOrder
-            : state.employeeOrder;
-          if (remote.absentLabel) state.absentLabel = remote.absentLabel;
-          if (remote.current) state.current = remote.current;
-          if ("selectedEmployee" in remote)
-            selectedEmployee = remote.selectedEmployee;
-          localStorage.setItem(LS_KEY, JSON.stringify(remote));
-          applyAbsentLabel();
-          renderEmployees();
-          renderCalendar();
-        }
-      }
-      let syncTimer = null;
-      function queueCloudSync() {
-        clearTimeout(syncTimer);
-        syncTimer = setTimeout(pushToCloud, 700);
-      }
-      async function pushToCloud() {
-        const payload = {
-          employees: state.employees,
-          employeeOrder: state.employeeOrder,
-          absentLabel: state.absentLabel,
-          current: state.current,
-          selectedEmployee:
-            typeof selectedEmployee !== "undefined" ? selectedEmployee : null,
-          updatedAt: Date.now(),
-        };
-        localStorage.setItem(LS_KEY, JSON.stringify(payload));
-        const { error } = await supa
-          .from("vac_state")
-          .upsert({ id: USER_ID, data: payload });
-        if (error) console.warn("[push] error", error);
-      }
-      // Override saveState to also queue cloud sync
-      window.saveState = function () {
-        try {
-          const toStore = {
-            employees: state.employees,
-            employeeOrder: state.employeeOrder,
-            absentLabel: state.absentLabel,
-            current: state.current,
-            selectedEmployee:
-              typeof selectedEmployee !== "undefined" ? selectedEmployee : null,
-            updatedAt: Date.now(),
-          };
-          localStorage.setItem(LS_KEY, JSON.stringify(toStore));
-        } catch {}
-        queueCloudSync();
+  const LS_KEY = STORAGE_KEY;
+  const USER_ID = 'team-global'; // keep shared; change if you want separate teams
+
+  // We remember the server's authoritative timestamp to avoid overwriting newer data
+  let lastSeenServerTs = null; // ISO timestamp from `updated_at` column
+
+  async function getRemoteSnap() {
+    const { data, error } = await supa
+      .from('vac_state')
+      .select('data, updated_at')
+      .eq('id', USER_ID)
+      .maybeSingle();
+    if (error) {
+      console.warn('[supabase/get] error', error);
+      return { data: null, updated_at: null };
+    }
+    return { data: data?.data ?? null, updated_at: data?.updated_at ?? null };
+  }
+
+  async function pullFromCloud(force = false) {
+    const remote = await getRemoteSnap();
+    if (!remote.data) return;
+
+    // If we don't have a local cache or we're forced, adopt remote.
+    // Else, adopt remote if it's newer than what we've last seen.
+    const local = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    const localSeen = lastSeenServerTs; // what this tab last applied
+    const serverTs = remote.updated_at;
+
+    const shouldAdopt =
+      force ||
+      !local || Object.keys(local).length === 0 ||
+      !localSeen || (serverTs && serverTs !== localSeen);
+
+    if (shouldAdopt) {
+      if (remote.data.employees) state.employees = remote.data.employees;
+      state.employeeOrder = Array.isArray(remote.data.employeeOrder) ? remote.data.employeeOrder : state.employeeOrder;
+      if (remote.data.absentLabel) state.absentLabel = remote.data.absentLabel;
+      if (remote.data.current) state.current = remote.data.current;
+      if ('selectedEmployee' in remote.data) selectedEmployee = remote.data.selectedEmployee;
+
+      lastSeenServerTs = serverTs || lastSeenServerTs;
+      localStorage.setItem(LS_KEY, JSON.stringify(remote.data));
+      try { applyAbsentLabel(); } catch {}
+      try { renderEmployees(); renderCalendar(); } catch {}
+    }
+  }
+
+  // Compare-and-swap push:
+  // - Read server
+  // - If server timestamp matches our lastSeenServerTs, push our payload
+  // - Otherwise pull & skip push (we were stale)
+  async function pushToCloud() {
+    const payload = {
+      employees: state.employees,
+      employeeOrder: state.employeeOrder,
+      absentLabel: state.absentLabel,
+      current: state.current,
+      selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
+      updatedAt: Date.now() // kept for backwards compatibility, but not used for CAS
+    };
+
+    // Persist locally immediately
+    localStorage.setItem(LS_KEY, JSON.stringify(payload));
+
+    // Check current server version
+    const remote = await getRemoteSnap();
+    const serverTs = remote.updated_at;
+
+    if (lastSeenServerTs && serverTs && serverTs !== lastSeenServerTs) {
+      // Server is newer than what we last saw — do NOT overwrite; adopt remote
+      console.warn('[supabase/push] aborted, server has newer data. Pulling...');
+      await pullFromCloud(true);
+      return;
+    }
+
+    // Proceed with upsert; server will set updated_at
+    const { error } = await supa
+      .from('vac_state')
+      .upsert({ id: USER_ID, data: payload })
+      .select('updated_at') // get new server timestamp back
+      .single();
+
+    if (error) {
+      console.warn('[supabase/push] error', error);
+      return;
+    }
+
+    // Refresh our marker with server's timestamp after successful write
+    const after = await getRemoteSnap();
+    lastSeenServerTs = after.updated_at || lastSeenServerTs;
+  }
+
+  // Debounced queue
+  let syncTimer = null;
+  function queueCloudSync() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(pushToCloud, 700);
+  }
+
+  // Override saveState to always queue sync
+  window.saveState = function() {
+    try {
+      const toStore = {
+        employees: state.employees,
+        employeeOrder: state.employeeOrder,
+        absentLabel: state.absentLabel,
+        current: state.current,
+        selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
+        updatedAt: Date.now()
       };
-      // ensure local binding points to same fn
-      saveState = window.saveState;
+      localStorage.setItem(LS_KEY, JSON.stringify(toStore));
+    } catch {}
+    queueCloudSync();
+  };
+  // Keep local reference in case other code calls saveState()
+  saveState = window.saveState;
 
-      document.addEventListener("DOMContentLoaded", async () => {
-        await pullFromCloud();
-        queueCloudSync();
-      });
-    </script>
+  // Gentle auto-refresh to avoid long-open tabs being stale
+  const POLL_MS = 15000; // 15s is fine for casual collaboration
+  let pollHandle = null;
+  function startPolling() {
+    stopPolling();
+    pollHandle = setInterval(()=>pullFromCloud(false), POLL_MS);
+  }
+  function stopPolling() {
+    if (pollHandle) clearInterval(pollHandle);
+    pollHandle = null;
+  }
+  document.addEventListener('visibilitychange', ()=>{
+    if (document.visibilityState === 'visible') {
+      pullFromCloud(true);
+      startPolling();
+    } else {
+      stopPolling();
+    }
+  });
+
+  // First load: ALWAYS pull before any push is queued
+  document.addEventListener('DOMContentLoaded', async () => {
+    await pullFromCloud(true);
+    startPolling();
+  });
+</script>
   </body>
 </html>
+
 
 
 
