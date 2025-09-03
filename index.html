@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Vacation Tracker — Calendar + Dashboard (08/20/2025)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
       :root[data-theme="light"] {
         --fedex-purple: #4d148c;
@@ -297,12 +298,23 @@
         font-size: 0.92rem;
         border-bottom: 1px dashed var(--line);
         vertical-align: middle;
+     
       }
       td.name-cell {
         font-weight: 800;
         color: var(--name-cell);
         cursor: pointer;
+        font-family: 'Poppins', sans-serif; /* ← add this */
       }
+
+      td.name-cell,
+      .chip,
+      #memberModalTitle,
+      #editMemberName {
+      font-family: 'Poppins', sans-serif;
+      }
+
+
       tr.row-selected td {
         background: var(--row-selected);
       }
@@ -2682,6 +2694,7 @@
     </script>
   </body>
 </html>
+
 
 
 
