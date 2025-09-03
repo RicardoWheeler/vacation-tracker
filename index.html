@@ -37,6 +37,12 @@
         --select-shadow: var(--btn-shadow);
         --select-option-bg: #ffffff;
         --select-option-text: #111827;
+
+        /* NEW: Holiday / Weekend visuals (light) */
+        --holiday-bg: #f1f1f9;
+        --holiday-border: rgba(37, 99, 235, 0.25);
+        --weekend-bg: #f1f1f9;
+        --weekend-border: rgba(0, 0, 0, 0.08);
       }
       :root[data-theme="dark"] {
         --fedex-purple: #4d148c;
@@ -68,6 +74,12 @@
         --select-shadow: var(--btn-shadow);
         --select-option-bg: #111827;
         --select-option-text: #e5e7eb;
+
+        /* NEW: Holiday / Weekend visuals (dark) */
+        --holiday-bg: rgba(97, 96, 96, 0.06);
+        --holiday-border: rgba(59, 130, 246, 0.35);
+        --weekend-bg: rgba(97, 96, 96, 0.06);
+        --weekend-border: rgba(255, 255, 255, 0.09);
       }
 
       * {
@@ -214,6 +226,30 @@
         opacity: 0.35;
         pointer-events: none;
       }
+
+      /* NEW: Day state classes for weekends & holidays */
+      .day.is-weekend {
+        background: var(--weekend-bg);
+        border-color: var(--weekend-border);
+      }
+      .day.is-holiday {
+        background: var(--holiday-bg);
+        border-color: var(--holiday-border);
+        position: relative;
+      }
+      .day.is-holiday .holiday-tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 800;
+        border-radius: 999px;
+        padding: 2px 6px;
+        margin-top: -2px;
+        width: fit-content;
+        background: rgba(37, 99, 235, 0.12);
+        border: 1px solid var(--holiday-border);
+        color: var(--text);
+      }
+
       .chips {
         display: flex;
         flex-wrap: wrap;
@@ -552,7 +588,7 @@
         box-shadow: none;
       }
 
-      /* Modern, high-contrast select in dashboard header */
+      /* Modern select */
       .dh .toolbar {
         display: flex;
         gap: 8px;
@@ -584,7 +620,7 @@
         background: var(--select-option-bg);
       }
 
-      /* ---------- Member Stats modal: 2×2 card layout ---------- */
+      /* Member Stats modal */
       #memberModal .modal-content {
         max-width: 640px;
         border-radius: 16px;
@@ -621,12 +657,11 @@
         font-weight: 800;
         line-height: 1.4;
       }
-      /* Style the close button inside modal */
       #memberModal .close {
         position: absolute;
-        top: 10px; /* distance from top */
-        right: 12px; /* distance from right */
-        left: auto; /* override any left positioning */
+        top: 10px;
+        right: 12px;
+        left: auto;
         font-size: 18px;
         font-weight: bold;
         color: #333;
@@ -638,18 +673,36 @@
         color: #000;
       }
 
-      /* PRINT: show our dedicated dashboard/summary areas when printing */
+      /* PRINT */
       @media print {
         body > * {
           display: none !important;
         }
-        #printSection,
-        #printMemberSection,
-        #printDashboard {
+
+        /* Only show the relevant section for the current print mode */
+        .print-fy #printSection,
+        .print-fy #printDashboard {
           display: block !important;
         }
 
-        /* Summary report pages */
+        .print-member #printMemberSection {
+          display: block !important;
+        }
+
+        .print-dashboard #printDashboard {
+          display: block !important;
+        }
+
+        /* Layout/quality for dashboard images when printed */
+        #printDashboard img {
+          display: block;
+          width: 100%;
+          height: auto;
+          border: 1px solid #000;
+          margin: 8px 0;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
         #printSection {
           padding: 28px !important;
           color: #000;
@@ -683,13 +736,6 @@
           padding: 6px 8px;
         }
 
-        /* Print dashboards (if used) */
-        #printDashboard img {
-          max-width: 100%;
-          height: auto;
-          border: 1px solid #000;
-          margin: 8px 0;
-        }
         #printDashboard h2 {
           margin: 0 0 10px;
         }
@@ -727,10 +773,13 @@
   </head>
   <body>
     <header>
-      <h1>☑️ Vacation Tracker</h1>
+      <h1>📅 Vacation Tracker</h1>
       <div class="controls">
         <button class="btn btn-ghost" id="renameAbsentBtn"
           >Rename “Absent”</button
+        >
+        <button class="btn btn-ghost" id="manageHolidaysBtn"
+          >Manage Holidays</button
         >
         <button class="btn btn-primary" id="printBtn"
           >Print Report (Fiscal Year)</button
@@ -753,13 +802,13 @@
 
         <div class="summary" aria-label="employee table">
           <table>
-            <thead
-              ><tr
-                ><th>Name</th
-                ><th style="text-align: right">V / S / A (FY used/limit)</th
-                ><th style="text-align: right">Actions</th></tr
-              ></thead
-            >
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th style="text-align: right">V / S / A (FY used/limit)</th>
+                <th style="text-align: right">Actions</th>
+              </tr>
+            </thead>
             <tbody id="employeeTableBody"></tbody>
           </table>
         </div>
@@ -827,7 +876,7 @@
             >Open Absence Dashboard</button
           >
           <div class="muted" style="margin-top: 8px"
-            >Team trends & per‑employee stats (V/S/A).</div
+            >Team trends & per-employee stats (V/S/A).</div
           >
         </div>
       </aside>
@@ -854,7 +903,7 @@
 
         <div class="weekday-row" aria-hidden="true">
           <div class="weekday">Sun</div><div class="weekday">Mon</div
-          ><div class="weekday">Tue</div> <div class="weekday">Wed</div
+          ><div class="weekday">Tue</div><div class="weekday">Wed</div
           ><div class="weekday">Thu</div><div class="weekday">Fri</div
           ><div class="weekday">Sat</div>
         </div>
@@ -988,24 +1037,79 @@
       </div>
     </div>
 
+    <!-- Holidays Modal -->
+    <div
+      id="holidaysModal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="holidaysTitle"
+    >
+      <div class="modal-content">
+        <button class="modal-close" id="holidaysX" aria-label="Close">×</button>
+        <h3 id="holidaysTitle">Manage Holidays</h3>
+        <div class="grid-4" style="margin-top: 8px">
+          <div style="grid-column: span 2">
+            <label for="holidayDate">Date</label>
+            <input id="holidayDate" type="date" class="inline-input" />
+          </div>
+          <div style="grid-column: span 2">
+            <label for="holidayName">Name</label>
+            <input
+              id="holidayName"
+              class="inline-input"
+              placeholder="e.g., Independence Day"
+            />
+          </div>
+        </div>
+        <div
+          style="margin-top: 8px; display: flex; align-items: center; gap: 8px"
+        >
+          <input id="holidayRepeat" type="checkbox" />
+          <label for="holidayRepeat" class="muted">Repeat yearly</label>
+        </div>
+        <div class="modal-actions" style="margin-top: 10px">
+          <button class="btn btn-primary" id="addHolidayBtn"
+            >Add / Update</button
+          >
+          <button class="btn btn-ghost" id="closeHolidays">Close</button>
+        </div>
+        <hr style="margin: 12px 0; border-color: var(--line)" />
+        <div>
+          <h4 style="margin: 0 0 6px 0" class="muted">Holidays</h4>
+          <ul
+            id="holidaysList"
+            style="
+              list-style: none;
+              padding: 0;
+              margin: 0;
+              display: grid;
+              gap: 6px;
+            "
+          ></ul>
+        </div>
+      </div>
+    </div>
+
     <!-- Print sections -->
-    <div id="printSection" style="display: none; padding: 20px"
-      ><h2>Absence Report — <span id="printFYTitle"></span></h2
-      ><div id="printEmployeesContainer"></div
-    ></div>
+    <div id="printSection" style="display: none; padding: 20px">
+      <h2>Absence Report — <span id="printFYTitle"></span></h2>
+      <div id="printEmployeesContainer"></div>
+    </div>
     <div id="printMemberSection" style="display: none; padding: 20px">
       <h2
         >Member Absence Report — <span id="printMemberName"></span> —
         <span id="printMemberFY"></span
       ></h2>
-      <table id="memberReportTable"
-        ><thead
+      <table id="memberReportTable">
+        <thead
           ><tr
             ><th>Category</th><th>Used (FY)</th><th>Remaining (FY)</th
             ><th>FY Limit</th></tr
           ></thead
-        ><tbody id="memberReportTBody"></tbody
-      ></table>
+        >
+        <tbody id="memberReportTBody"></tbody>
+      </table>
     </div>
 
     <!-- DASHBOARD OVERLAY -->
@@ -1120,8 +1224,8 @@
     <!-- Print-only dashboard snapshots -->
     <div id="printDashboard" style="display: none; padding: 20px">
       <h2>Absence Dashboard — <span id="printDashFY"></span></h2>
-      <div class="kpis"
-        ><span class="kpi"
+      <div class="kpis">
+        <span class="kpi"
           ><b>Vacation:</b> <span id="printKpiVac">0</span></span
         >
         <span class="kpi"><b>Sick:</b> <span id="printKpiSick">0</span></span>
@@ -1165,6 +1269,7 @@
           absentLabel: state.absentLabel,
           current: state.current,
           selectedEmployee,
+          holidays: state.holidays, // NEW
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
         try {
@@ -1184,6 +1289,7 @@
             if (data.absentLabel) state.absentLabel = data.absentLabel;
             if (data.current) state.current = data.current;
             if (data.selectedEmployee) selectedEmployee = data.selectedEmployee;
+            if (data.holidays) state.holidays = data.holidays; // NEW
             return true;
           }
         } catch (e) {
@@ -1200,6 +1306,7 @@
           return { year: d.getFullYear(), month: d.getMonth() };
         })(),
         absentLabel: localStorage.getItem("vac_abs_label") || "Absent",
+        holidays: {}, // NEW  {"YYYY-MM-DD": {name, repeatYearly}}
       };
       let selectedEmployee = null;
       const DEFAULT_FY_LIMITS = { vac: 20, sick: 10, abs: 10 };
@@ -1286,6 +1393,27 @@
         ensureOrderIntegrity();
         return state.employeeOrder.slice();
       }
+
+      // NEW: Holiday helpers
+      function isoDate(y, m, day) {
+        return `${y}-${String(m + 1).padStart(2, "0")}-${String(day).padStart(
+          2,
+          "0"
+        )}`;
+      }
+      function isWeekend(y, m, day) {
+        const d = new Date(y, m, day).getDay();
+        return d === 0 || d === 6;
+      }
+      function holidayFor(y, m, day) {
+        const iso = isoDate(y, m, day);
+        if (state.holidays[iso]) return state.holidays[iso];
+        const mmdd = iso.slice(5);
+        for (const [key, h] of Object.entries(state.holidays)) {
+          if (h && h.repeatYearly && key.slice(5) === mmdd) return h;
+        }
+        return null;
+      }
     </script>
 
     <!-- Chart.js + DataLabels -->
@@ -1305,8 +1433,8 @@
           const tr = document.createElement("tr");
           if (selectedEmployee === name) tr.classList.add("row-selected");
           tr.innerHTML = `<td class="name-cell" title="Select ${name}">${name}</td>
-        <td style="text-align:right">${sums.used.v}/${sums.limits.vac} • ${sums.used.s}/${sums.limits.sick} • ${sums.used.a}/${sums.limits.abs}</td>
-        <td class="row-actions" style="text-align:right"><button class="btn-mini edit-btn" title="Edit">Edit</button><button class="btn-mini del-btn" title="Delete">Del</button></td>`;
+          <td style="text-align:right">${sums.used.v}/${sums.limits.vac} • ${sums.used.s}/${sums.limits.sick} • ${sums.used.a}/${sums.limits.abs}</td>
+          <td class="row-actions" style="text-align:right"><button class="btn-mini edit-btn" title="Edit">Edit</button><button class="btn-mini del-btn" title="Delete">Del</button></td>`;
           tr.querySelector(".name-cell").addEventListener("click", () => {
             selectedEmployee = name;
             renderEmployees();
@@ -1350,6 +1478,11 @@
           cell.dataset.day = day;
           const chips = document.createElement("div");
           chips.className = "chips";
+
+          // Weekend mark
+          if (isWeekend(y, m, day)) cell.classList.add("is-weekend");
+
+          // Build chips (existing logic)
           getOrderedNames().forEach((name) => {
             const emp = state.employees[name];
             const md = ensureMonthData(emp, key);
@@ -1387,7 +1520,18 @@
               chips.appendChild(c);
             }
           });
+
+          // Holiday mark + tag
+          const h = holidayFor(y, m, day);
           cell.innerHTML = `<strong>${day}</strong>`;
+          if (h) {
+            cell.classList.add("is-holiday");
+            const tag = document.createElement("div");
+            tag.className = "holiday-tag";
+            tag.textContent = `⚪ ${h.name}`;
+            cell.appendChild(tag);
+          }
+
           cell.appendChild(chips);
           cell.addEventListener("click", () => openAssignModal(day));
           calEl.appendChild(cell);
@@ -1518,6 +1662,7 @@
           modal.style.display = "none";
           memberModal.style.display = "none";
           editMemberModal.style.display = "none";
+          holidaysModal.style.display = "none";
         }
       });
       window.addEventListener("click", (e) => {
@@ -1525,6 +1670,7 @@
         if (e.target === memberModal) memberModal.style.display = "none";
         if (e.target === editMemberModal)
           editMemberModal.style.display = "none";
+        if (e.target === holidaysModal) holidaysModal.style.display = "none";
       });
 
       /* Member modal */
@@ -1610,10 +1756,16 @@
           tr.innerHTML = `<td>${r.label}</td><td>${r.used}</td><td>${r.rem}</td><td>${r.limit}</td>`;
           memberReportTBody.appendChild(tr);
         });
-        document.getElementById("printSection").style.display = "none";
+
+        // Print only the member section
+        document.body.classList.remove("print-fy", "print-dashboard");
+        document.body.classList.add("print-member");
         printMemberSection.style.display = "block";
-        window.print();
-        printMemberSection.style.display = "none";
+        setTimeout(() => {
+          window.print();
+          printMemberSection.style.display = "none";
+          document.body.classList.remove("print-member");
+        }, 50);
       });
 
       /* Edit member */
@@ -1651,7 +1803,6 @@
           sick: Number.isFinite(s) ? Math.max(0, s) : DEFAULT_FY_LIMITS.sick,
           abs: Number.isFinite(a) ? Math.max(0, a) : DEFAULT_FY_LIMITS.abs,
         };
-
         if (newName !== editMemberOriginalName) {
           if (state.employees[newName]) {
             alert("A member with that name already exists.");
@@ -1714,63 +1865,31 @@
           saveState();
         });
 
-      /* --------- PRINT (FY) — summary page per employee --------- */
+      /* --------- PRINT helpers (used by FY print) --------- */
       const printFYTitle = document.getElementById("printFYTitle");
       const printEmployeesContainer = document.getElementById(
         "printEmployeesContainer"
       );
 
-      document.getElementById("printBtn").addEventListener("click", () => {
-        const { year: y, month: m } = state.current;
-        const fyStart = fiscalStartYearFor(y, m);
-        printFYTitle.textContent = `Fiscal Year Jun 1, ${fyStart} – May 31, ${
-          fyStart + 1
-        }`;
-
-        printEmployeesContainer.innerHTML = "";
-        getOrderedNames().forEach((name) => {
-          printEmployeesContainer.appendChild(
-            buildEmployeeFYSummaryBlock(name, fyStart)
-          );
-        });
-
-        document.getElementById("printMemberSection").style.display = "none";
-        document.getElementById("printSection").style.display = "block";
-        window.print();
-        document.getElementById("printSection").style.display = "none";
-      });
-
       function buildEmployeeFYSummaryBlock(name, fyStartYear) {
         const emp = state.employees[name];
         const sums = fySums(emp, fyStartYear);
-
         const wrap = document.createElement("div");
         wrap.className = "print-member-block";
-
         const title = document.createElement("h3");
         title.style.margin = "0 0 10px 0";
         title.textContent = `Member Absence Report — ${name} — Fiscal Year Jun 1, ${fyStartYear} – May 31, ${
           fyStartYear + 1
         }`;
         wrap.appendChild(title);
-
         const table = document.createElement("table");
         table.className = "print-summary";
-        table.innerHTML = `
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Used (FY)</th>
-            <th>Remaining (FY)</th>
-            <th>FY Limit</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Vacation</td><td>${sums.used.v}</td><td>${sums.remaining.v}</td><td>${sums.limits.vac}</td></tr>
-          <tr><td>Sick</td><td>${sums.used.s}</td><td>${sums.remaining.s}</td><td>${sums.limits.sick}</td></tr>
-          <tr><td>${state.absentLabel}</td><td>${sums.used.a}</td><td>${sums.remaining.a}</td><td>${sums.limits.abs}</td></tr>
-        </tbody>
-      `;
+        table.innerHTML = `<thead><tr><th>Category</th><th>Used (FY)</th><th>Remaining (FY)</th><th>FY Limit</th></tr></thead>
+          <tbody>
+            <tr><td>Vacation</td><td>${sums.used.v}</td><td>${sums.remaining.v}</td><td>${sums.limits.vac}</td></tr>
+            <tr><td>Sick</td><td>${sums.used.s}</td><td>${sums.remaining.s}</td><td>${sums.limits.sick}</td></tr>
+            <tr><td>${state.absentLabel}</td><td>${sums.used.a}</td><td>${sums.remaining.a}</td><td>${sums.limits.abs}</td></tr>
+          </tbody>`;
         wrap.appendChild(table);
         return wrap;
       }
@@ -1788,7 +1907,6 @@
     <!-- DASHBOARD LOGIC -->
     <script>
       const dashboardOverlay = document.getElementById("dashboardOverlay");
-      const openDashboardBtn = document.getElementById("openDashboard");
       const dashClose = document.getElementById("dashClose");
       const dashFY = document.getElementById("dashFY");
       const dashEmpSelect = document.getElementById("dashEmpSelect");
@@ -1807,7 +1925,6 @@
       const empSickUsedEl = document.getElementById("empSickUsed");
       const empAbsUsedEl = document.getElementById("empAbsUsed");
       const empAbsRemainingEl = document.getElementById("empAbsRemaining");
-      const empTrendTitle = document.getElementById("empTrendTitle");
 
       const printDash = document.getElementById("printDashboard");
       const printDashFY = document.getElementById("printDashFY");
@@ -2111,7 +2228,7 @@
         }, 30);
       });
 
-      /* PRINT from dashboard — snapshots for PDF */
+      /* PRINT from dashboard — snapshots for PDF (when overlay is open) */
       function fillDashboardPrintArea() {
         const { year, month } = state.current;
         const fyStart = fiscalStartYearFor(year, month);
@@ -2134,165 +2251,439 @@
       }
       dashPrint.addEventListener("click", () => {
         fillDashboardPrintArea();
+        document.body.classList.remove("print-fy", "print-member");
+        document.body.classList.add("print-dashboard");
         printDash.style.display = "block";
         window.print();
         printDash.style.display = "none";
+        document.body.classList.remove("print-dashboard");
+      });
+
+      // Build temporary charts off-screen, snapshot them, then clean up
+      function buildTempDashboardSnapshots(fyStart, empName) {
+        return new Promise((resolve) => {
+          const factory = document.createElement("div");
+          factory.style.position = "fixed";
+          factory.style.left = "-99999px";
+          factory.style.top = "0";
+          const c1 = document.createElement("canvas"),
+            c2 = document.createElement("canvas"),
+            c3 = document.createElement("canvas");
+          c1.width = c2.width = c3.width = 1000;
+          c1.height = c2.height = c3.height = 500;
+          factory.appendChild(c1);
+          factory.appendChild(c2);
+          factory.appendChild(c3);
+          document.body.appendChild(factory);
+
+          setChartDefaults();
+          const c = themeColors();
+          const labels = monthLabelsFY(fyStart);
+
+          const tvsa = teamVSAByMonth(fyStart);
+          const tempTeam = new Chart(c1.getContext("2d"), {
+            type: "bar",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "Vacation",
+                  data: tvsa.vac,
+                  backgroundColor: c.vac,
+                  stack: "t",
+                },
+                {
+                  label: "Sick",
+                  data: tvsa.sick,
+                  backgroundColor: c.sick,
+                  stack: "t",
+                },
+                {
+                  label: state.absentLabel,
+                  data: tvsa.abs,
+                  backgroundColor: c.abs,
+                  stack: "t",
+                },
+              ],
+            },
+            options: {
+              responsive: false,
+              maintainAspectRatio: false,
+              scales: {
+                x: { stacked: true },
+                y: {
+                  stacked: true,
+                  beginAtZero: true,
+                  ticks: { precision: 0 },
+                },
+              },
+            },
+          });
+
+          const t5 = top5Absent(fyStart);
+          const tempTop5 = new Chart(c2.getContext("2d"), {
+            type: "bar",
+            data: {
+              labels: t5.map((x) => x.name),
+              datasets: [
+                {
+                  label: `${state.absentLabel} (FY)`,
+                  data: t5.map((x) => x.a),
+                  backgroundColor: c.abs,
+                },
+              ],
+            },
+            options: {
+              indexAxis: "y",
+              responsive: false,
+              maintainAspectRatio: false,
+              scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } },
+                y: { grid: { display: false } },
+              },
+            },
+          });
+
+          const empSeries = employeeVSAByMonth(empName, fyStart);
+          const tempEmp = new Chart(c3.getContext("2d"), {
+            type: "bar",
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: "Vacation",
+                  data: empSeries.vac,
+                  backgroundColor: c.vac,
+                  stack: "emp",
+                },
+                {
+                  label: "Sick",
+                  data: empSeries.sick,
+                  backgroundColor: c.sick,
+                  stack: "emp",
+                },
+                {
+                  label: state.absentLabel,
+                  data: empSeries.abs,
+                  backgroundColor: c.abs,
+                  stack: "emp",
+                },
+              ],
+            },
+            options: {
+              responsive: false,
+              maintainAspectRatio: false,
+              scales: {
+                x: { stacked: true },
+                y: {
+                  stacked: true,
+                  beginAtZero: true,
+                  ticks: { precision: 0 },
+                },
+              },
+            },
+          });
+
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              try {
+                document.getElementById("imgTeamByMonth").src =
+                  tempTeam.toBase64Image();
+                document.getElementById("imgTop5").src =
+                  tempTop5.toBase64Image();
+                document.getElementById("imgEmpTrend").src =
+                  tempEmp.toBase64Image();
+              } catch {}
+              try {
+                tempTeam.destroy();
+                tempTop5.destroy();
+                tempEmp.destroy();
+              } catch {}
+              factory.remove();
+              resolve();
+            }, 120);
+          });
+        });
+      }
+
+      // Ensure the print dashboard images exist (use live charts if open; otherwise build temp)
+      async function ensureDashboardImagesForPrint() {
+        const { year, month } = state.current;
+        const fyStart = fiscalStartYearFor(year, month);
+        const empName =
+          selectedEmployee && state.employees[selectedEmployee]
+            ? selectedEmployee
+            : getOrderedNames()[0] || "";
+        document.getElementById("printDashFY").textContent =
+          fiscalHeader(fyStart);
+        document.getElementById(
+          "printEmpTitle"
+        ).innerHTML = `${empName} — V/S/<span id="printAbsLbl3">${
+          state.absentLabel[0] || "A"
+        }</span> by Month (FY)`;
+
+        if (chartTeamByMonth && chartTop5 && chartEmpTrend) {
+          document.getElementById("printKpiVac").textContent =
+            kpiVac.textContent;
+          document.getElementById("printKpiSick").textContent =
+            kpiSick.textContent;
+          document.getElementById("printKpiAbs").textContent =
+            kpiAbs.textContent;
+          fillDashboardPrintArea();
+          return;
+        }
+
+        const totals = getOrderedNames().reduce(
+          (acc, n) => {
+            const s = fySums(state.employees[n], fyStart);
+            acc.v += s.used.v;
+            acc.s += s.used.s;
+            acc.a += s.used.a;
+            return acc;
+          },
+          { v: 0, s: 0, a: 0 }
+        );
+        document.getElementById("printKpiVac").textContent = String(totals.v);
+        document.getElementById("printKpiSick").textContent = String(totals.s);
+        document.getElementById("printKpiAbs").textContent = String(totals.a);
+
+        await buildTempDashboardSnapshots(fyStart, empName);
+      }
+    </script>
+
+    <script>
+      /* FY Print button — prints selected employee (or all) and ensures charts show in print */
+      document
+        .getElementById("printBtn")
+        .addEventListener("click", async () => {
+          const { year: y, month: m } = state.current;
+          const fyStart = fiscalStartYearFor(y, m);
+          printFYTitle.textContent = `Fiscal Year Jun 1, ${fyStart} – May 31, ${
+            fyStart + 1
+          }`;
+
+          let namesToPrint = [];
+          const hasSelection =
+            selectedEmployee && state.employees[selectedEmployee];
+          if (hasSelection) {
+            namesToPrint = [selectedEmployee];
+          } else {
+            const goAll = confirm(
+              "No employee is selected. Print the report for ALL team members?"
+            );
+            if (!goAll) return;
+            namesToPrint = getOrderedNames();
+          }
+
+          printEmployeesContainer.innerHTML = "";
+          namesToPrint.forEach((name) => {
+            printEmployeesContainer.appendChild(
+              buildEmployeeFYSummaryBlock(name, fyStart)
+            );
+          });
+
+          await ensureDashboardImagesForPrint();
+
+          // FY mode: show FY section and dashboard images only
+          document.body.classList.remove("print-member", "print-dashboard");
+          document.body.classList.add("print-fy");
+
+          document.getElementById("printMemberSection").style.display = "none";
+          document.getElementById("printSection").style.display = "block";
+          printDash.style.display = "block"; // ensures images lay out before print
+
+          setTimeout(() => {
+            window.print();
+            document.getElementById("printSection").style.display = "none";
+            printDash.style.display = "none";
+            document.body.classList.remove("print-fy");
+          }, 150);
+        });
+    </script>
+
+    <!-- Holidays logic -->
+    <script>
+      // Modal elements
+      const holidaysModal = document.getElementById("holidaysModal");
+      const manageHolidaysBtn = document.getElementById("manageHolidaysBtn");
+      const holidaysX = document.getElementById("holidaysX");
+      const closeHolidays = document.getElementById("closeHolidays");
+      const holidayDate = document.getElementById("holidayDate");
+      const holidayName = document.getElementById("holidayName");
+      const holidayRepeat = document.getElementById("holidayRepeat");
+      const holidaysList = document.getElementById("holidaysList");
+      const addHolidayBtn = document.getElementById("addHolidayBtn");
+
+      function openHolidays() {
+        holidaysModal.style.display = "flex";
+        fillHolidaysList();
+      }
+      function closeHolidaysFn() {
+        holidaysModal.style.display = "none";
+      }
+
+      manageHolidaysBtn.addEventListener("click", openHolidays);
+      holidaysX.addEventListener("click", closeHolidaysFn);
+      closeHolidays.addEventListener("click", closeHolidaysFn);
+
+      function fillHolidaysList() {
+        holidaysList.innerHTML = "";
+        const { year: y, month: m } = state.current;
+        const items = Object.entries(state.holidays).map(([date, h]) => ({
+          date,
+          ...h,
+        }));
+
+        // Sort: items in current visible month first, then by date
+        items.sort((a, b) => {
+          const am = a.date.slice(0, 7),
+            bm = b.date.slice(0, 7);
+          const cur = `${y}-${String(m + 1).padStart(2, "0")}`;
+          if (am === cur && bm !== cur) return -1;
+          if (bm === cur && am !== cur) return 1;
+          return a.date.localeCompare(b.date);
+        });
+
+        for (const h of items) {
+          const li = document.createElement("li");
+          li.style.display = "flex";
+          li.style.justifyContent = "space-between";
+          li.style.alignItems = "center";
+          const left = document.createElement("div");
+          left.innerHTML = `<b>${h.name}</b> — <span class="muted">${h.date}${
+            h.repeatYearly ? " (repeats)" : ""
+          }</span>`;
+          const del = document.createElement("button");
+          del.className = "btn-mini";
+          del.textContent = "Delete";
+          del.addEventListener("click", () => {
+            delete state.holidays[h.date];
+            saveState();
+            renderCalendar();
+            fillHolidaysList();
+          });
+          li.appendChild(left);
+          li.appendChild(del);
+          holidaysList.appendChild(li);
+        }
+
+        if (items.length === 0) {
+          const li = document.createElement("li");
+          li.className = "muted";
+          li.textContent = "No holidays added yet.";
+          holidaysList.appendChild(li);
+        }
+      }
+
+      addHolidayBtn.addEventListener("click", () => {
+        const d = holidayDate.value; // "YYYY-MM-DD"
+        const n = holidayName.value.trim();
+        const r = !!holidayRepeat.checked;
+        if (!d || !n) {
+          alert("Please enter a date and a name.");
+          return;
+        }
+        state.holidays[d] = { name: n, repeatYearly: r };
+        holidayName.value = "";
+        holidayDate.value = "";
+        holidayRepeat.checked = false;
+        saveState();
+        renderCalendar();
+        fillHolidaysList();
       });
     </script>
 
-<!-- Supabase Sync (safe compare-and-swap) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const SUPABASE_URL = 'https://hazsbrxtlpelvahrnvej.supabase.co';
-  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhenNicnh0bHBlbHZhaHJudmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1NzUwNDQsImV4cCI6MjA3MTE1MTA0NH0.ayUb40bbzsgcUuau3heNcxJeSyRCmeP1yJW3lrk96Do';
-  const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    <!-- Supabase Sync -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      const SUPABASE_URL = "https://hazsbrxtlpelvahrnvej.supabase.co";
+      const SUPABASE_ANON =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhenNicnh0bHBlbHZhaHJudmVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1NzUwNDQsImV4cCI6MjA3MTE1MTA0NH0.ayUb40bbzsgcUuau3heNcxJeSyRCmeP1yJW3lrk96Do";
+      const supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      const LS_KEY = STORAGE_KEY;
+      const USER_ID = "team-global";
 
-  const LS_KEY = STORAGE_KEY;
-  const USER_ID = 'team-global'; // keep shared; change if you want separate teams
-
-  // We remember the server's authoritative timestamp to avoid overwriting newer data
-  let lastSeenServerTs = null; // ISO timestamp from `updated_at` column
-
-  async function getRemoteSnap() {
-    const { data, error } = await supa
-      .from('vac_state')
-      .select('data, updated_at')
-      .eq('id', USER_ID)
-      .maybeSingle();
-    if (error) {
-      console.warn('[supabase/get] error', error);
-      return { data: null, updated_at: null };
-    }
-    return { data: data?.data ?? null, updated_at: data?.updated_at ?? null };
-  }
-
-  async function pullFromCloud(force = false) {
-    const remote = await getRemoteSnap();
-    if (!remote.data) return;
-
-    // If we don't have a local cache or we're forced, adopt remote.
-    // Else, adopt remote if it's newer than what we've last seen.
-    const local = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    const localSeen = lastSeenServerTs; // what this tab last applied
-    const serverTs = remote.updated_at;
-
-    const shouldAdopt =
-      force ||
-      !local || Object.keys(local).length === 0 ||
-      !localSeen || (serverTs && serverTs !== localSeen);
-
-    if (shouldAdopt) {
-      if (remote.data.employees) state.employees = remote.data.employees;
-      state.employeeOrder = Array.isArray(remote.data.employeeOrder) ? remote.data.employeeOrder : state.employeeOrder;
-      if (remote.data.absentLabel) state.absentLabel = remote.data.absentLabel;
-      if (remote.data.current) state.current = remote.data.current;
-      if ('selectedEmployee' in remote.data) selectedEmployee = remote.data.selectedEmployee;
-
-      lastSeenServerTs = serverTs || lastSeenServerTs;
-      localStorage.setItem(LS_KEY, JSON.stringify(remote.data));
-      try { applyAbsentLabel(); } catch {}
-      try { renderEmployees(); renderCalendar(); } catch {}
-    }
-  }
-
-  // Compare-and-swap push:
-  // - Read server
-  // - If server timestamp matches our lastSeenServerTs, push our payload
-  // - Otherwise pull & skip push (we were stale)
-  async function pushToCloud() {
-    const payload = {
-      employees: state.employees,
-      employeeOrder: state.employeeOrder,
-      absentLabel: state.absentLabel,
-      current: state.current,
-      selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
-      updatedAt: Date.now() // kept for backwards compatibility, but not used for CAS
-    };
-
-    // Persist locally immediately
-    localStorage.setItem(LS_KEY, JSON.stringify(payload));
-
-    // Check current server version
-    const remote = await getRemoteSnap();
-    const serverTs = remote.updated_at;
-
-    if (lastSeenServerTs && serverTs && serverTs !== lastSeenServerTs) {
-      // Server is newer than what we last saw — do NOT overwrite; adopt remote
-      console.warn('[supabase/push] aborted, server has newer data. Pulling...');
-      await pullFromCloud(true);
-      return;
-    }
-
-    // Proceed with upsert; server will set updated_at
-    const { error } = await supa
-      .from('vac_state')
-      .upsert({ id: USER_ID, data: payload })
-      .select('updated_at') // get new server timestamp back
-      .single();
-
-    if (error) {
-      console.warn('[supabase/push] error', error);
-      return;
-    }
-
-    // Refresh our marker with server's timestamp after successful write
-    const after = await getRemoteSnap();
-    lastSeenServerTs = after.updated_at || lastSeenServerTs;
-  }
-
-  // Debounced queue
-  let syncTimer = null;
-  function queueCloudSync() {
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(pushToCloud, 700);
-  }
-
-  // Override saveState to always queue sync
-  window.saveState = function() {
-    try {
-      const toStore = {
-        employees: state.employees,
-        employeeOrder: state.employeeOrder,
-        absentLabel: state.absentLabel,
-        current: state.current,
-        selectedEmployee: (typeof selectedEmployee !== 'undefined' ? selectedEmployee : null),
-        updatedAt: Date.now()
+      async function pullFromCloud() {
+        const { data, error } = await supa
+          .from("vac_state")
+          .select("data,updated_at")
+          .eq("id", USER_ID)
+          .maybeSingle();
+        if (error) {
+          console.warn("[pull] error", error);
+          return;
+        }
+        if (!data) return;
+        const remote = data.data;
+        const local = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+        const lt = local?.updatedAt || 0,
+          rt = remote?.updatedAt || 0;
+        if (rt > lt) {
+          if (remote.employees) state.employees = remote.employees;
+          state.employeeOrder = Array.isArray(remote.employeeOrder)
+            ? remote.employeeOrder
+            : state.employeeOrder;
+          if (remote.absentLabel) state.absentLabel = remote.absentLabel;
+          if (remote.current) state.current = remote.current;
+          if ("selectedEmployee" in remote)
+            selectedEmployee = remote.selectedEmployee;
+          if (remote.holidays) state.holidays = remote.holidays; // NEW
+          localStorage.setItem(LS_KEY, JSON.stringify(remote));
+          applyAbsentLabel();
+          renderEmployees();
+          renderCalendar();
+        }
+      }
+      let syncTimer = null;
+      function queueCloudSync() {
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(pushToCloud, 700);
+      }
+      async function pushToCloud() {
+        const payload = {
+          employees: state.employees,
+          employeeOrder: state.employeeOrder,
+          absentLabel: state.absentLabel,
+          current: state.current,
+          selectedEmployee:
+            typeof selectedEmployee !== "undefined" ? selectedEmployee : null,
+          holidays: state.holidays, // NEW
+          updatedAt: Date.now(),
+        };
+        localStorage.setItem(LS_KEY, JSON.stringify(payload));
+        const { error } = await supa
+          .from("vac_state")
+          .upsert({ id: USER_ID, data: payload });
+        if (error) console.warn("[push] error", error);
+      }
+      // Override saveState to also queue cloud sync
+      window.saveState = function () {
+        try {
+          const toStore = {
+            employees: state.employees,
+            employeeOrder: state.employeeOrder,
+            absentLabel: state.absentLabel,
+            current: state.current,
+            selectedEmployee:
+              typeof selectedEmployee !== "undefined" ? selectedEmployee : null,
+            holidays: state.holidays, // NEW
+            updatedAt: Date.now(),
+          };
+          localStorage.setItem(LS_KEY, JSON.stringify(toStore));
+        } catch {}
+        queueCloudSync();
       };
-      localStorage.setItem(LS_KEY, JSON.stringify(toStore));
-    } catch {}
-    queueCloudSync();
-  };
-  // Keep local reference in case other code calls saveState()
-  saveState = window.saveState;
+      saveState = window.saveState;
 
-  // Gentle auto-refresh to avoid long-open tabs being stale
-  const POLL_MS = 15000; // 15s is fine for casual collaboration
-  let pollHandle = null;
-  function startPolling() {
-    stopPolling();
-    pollHandle = setInterval(()=>pullFromCloud(false), POLL_MS);
-  }
-  function stopPolling() {
-    if (pollHandle) clearInterval(pollHandle);
-    pollHandle = null;
-  }
-  document.addEventListener('visibilitychange', ()=>{
-    if (document.visibilityState === 'visible') {
-      pullFromCloud(true);
-      startPolling();
-    } else {
-      stopPolling();
-    }
-  });
-
-  // First load: ALWAYS pull before any push is queued
-  document.addEventListener('DOMContentLoaded', async () => {
-    await pullFromCloud(true);
-    startPolling();
-  });
-</script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        await pullFromCloud();
+        queueCloudSync();
+      });
+    </script>
   </body>
 </html>
+
+
 
 
 
