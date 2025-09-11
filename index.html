@@ -24,6 +24,15 @@
         --row-selected: rgba(77, 20, 140, 0.08);
         --sidebar-heading: var(--fedex-purple);
         --overlay-bg: rgba(8, 13, 26, 0.5);
+        /* Selected day ring + glow (light) */
+        --tile-ring: rgba(77, 20, 140, 0.55); /* FedEx purple ring */
+        --tile-glow: rgba(77, 20, 140, 0.2); /* soft purple halo */
+        --tile-hover-shadow: rgba(
+          0,
+          0,
+          0,
+          0.14
+        ); /* subtle general hover shadow */
 
         /* Modern button colors */
         --btn-refresh-1: #0ea5e9;
@@ -63,7 +72,20 @@
         --row-selected: rgba(255, 255, 255, 0.08);
         --sidebar-heading: #fff;
         --overlay-bg: rgba(0, 0, 0, 0.6);
-
+        /* Selected day ring + glow (dark) */
+        --tile-ring: rgba(
+          173,
+          135,
+          233,
+          0.75
+        ); /* lighter purple ring for dark bg */
+        --tile-glow: rgba(125, 60, 207, 0.28); /* slightly stronger halo */
+        --tile-hover-shadow: rgba(
+          0,
+          0,
+          0,
+          0.5
+        ); /* deeper hover shadow on dark */
         --btn-refresh-1: #22d3ee;
         --btn-refresh-2: #0ea5e9;
         --btn-print-1: #fb923c;
@@ -242,6 +264,49 @@
         flex-direction: column;
         gap: 6px;
       }
+
+      /* Smooth interactions for day tiles */
+      .day {
+        transition: box-shadow 160ms ease, transform 140ms ease,
+          border-color 160ms ease;
+        outline: none;
+      }
+
+      .day:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px var(--tile-hover-shadow);
+        border-color: transparent;
+      }
+
+      /* Visually-selected date tile */
+      .day.selected {
+        box-shadow: 0 0 0 2px var(--tile-ring) inset,
+          /* inner ring */ 0 8px 18px var(--tile-glow); /* soft outer glow */
+        border-color: transparent;
+      }
+
+      /* Hover animation only when the tile is selected */
+      .day.selected:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 0 2px var(--tile-ring) inset,
+          0 14px 26px var(--tile-glow);
+      }
+
+      /* Keyboard focus for accessibility */
+      .day.selected:focus-visible {
+        box-shadow: 0 0 0 3px var(--tile-ring) inset,
+          0 12px 22px var(--tile-glow);
+      }
+
+      /* Respect users who prefer reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        .day,
+        .day.selected:hover {
+          transition: none;
+          transform: none;
+        }
+      }
+
       .day.disabled {
         opacity: 0.35;
         pointer-events: none;
@@ -1633,7 +1698,17 @@
           }
 
           cell.appendChild(chips);
-          cell.addEventListener("click", () => openAssignModal(day));
+          cell.addEventListener("click", (e) => {
+            // Clear any previous selected tile
+            document
+              .querySelectorAll(".day.selected")
+              .forEach((el) => el.classList.remove("selected"));
+            // Mark the clicked tile
+            e.currentTarget.classList.add("selected");
+            // Continue with existing flow
+            openAssignModal(day);
+          });
+
           calEl.appendChild(cell);
         }
       }
@@ -2828,6 +2903,8 @@
     </script>
   </body>
 </html>
+
+
 
 
 
