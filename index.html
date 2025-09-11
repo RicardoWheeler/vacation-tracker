@@ -4,7 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Vacation Tracker — Calendar + Dashboard (08/20/2025)</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root[data-theme="light"] {
         --fedex-purple: #4d148c;
@@ -132,6 +135,22 @@
         color: #fff;
         border: 1px solid rgba(255, 255, 255, 0.35);
       }
+      /* Default ghost buttons (work on light/dark cards, incl. the Assign modal) */
+      .btn-ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--line);
+      }
+      .btn-ghost:hover {
+        background: rgba(0, 0, 0, 0.05);
+      }
+
+      /* Keep header ghost buttons white on the purple bar */
+      header .btn-ghost {
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.35);
+      }
+
       .btn-outline {
         background: transparent;
         color: var(--text);
@@ -280,6 +299,14 @@
         background: var(--fedex-grey);
         color: #111;
       }
+      /* Planned Vacation (faded) */
+      .chip.plan {
+        background: transparent;
+        color: var(--text);
+        opacity: 0.5;
+        border: 1px dashed var(--fedex-purple);
+        font-weight: 700;
+      }
 
       .summary table {
         width: 100%;
@@ -298,22 +325,20 @@
         font-size: 0.92rem;
         border-bottom: 1px dashed var(--line);
         vertical-align: middle;
-     
       }
       td.name-cell {
         font-weight: 800;
         color: var(--name-cell);
         cursor: pointer;
-        font-family: 'Poppins', sans-serif; /* ← add this */
+        font-family: "Poppins", sans-serif; /* ← add this */
       }
 
       td.name-cell,
       .chip,
       #memberModalTitle,
       #editMemberName {
-      font-family: 'Poppins', sans-serif;
+        font-family: "Poppins", sans-serif;
       }
-
 
       tr.row-selected td {
         background: var(--row-selected);
@@ -810,6 +835,13 @@
             ><span class="dot a"></span>
             <span id="legendAbsentText">Absent</span></span
           >
+          <span class="kpi"
+            ><span
+              class="dot v"
+              style="border: 1px dashed currentColor; background: transparent"
+            ></span>
+            Planned</span
+          >
         </div>
 
         <div class="summary" aria-label="employee table">
@@ -936,8 +968,17 @@
           >×</button
         >
         <h3 id="modalTitle">Assign Day</h3>
+        <div class="muted" id="modalPlannedNote" style="margin-top: -4px"
+          >Planned (FY): 0</div
+        >
         <div class="modal-actions">
           <button class="btn btn-vac" id="assignVacation">Vacation</button>
+          <button
+            class="btn btn-ghost"
+            id="assignPlanned"
+            title="Planned Vacation (FY only)"
+            >Planned</button
+          >
           <button class="btn btn-sick" id="assignSick">Sick</button>
           <button class="btn btn-abs" id="assignAbsent">Absent</button>
           <button class="btn btn-cancel" id="clearDay">Clear</button>
@@ -983,6 +1024,12 @@
             ><div class="num" id="msTotalUsed">0 days used (FY)</div></div
           >
         </div>
+        <div class="stat">
+          <h4>Planned</h4>
+          <div class="num" id="msPlanFY">0 planned (FY)</div>
+          <div class="muted">Informational – not deducted from limits</div>
+        </div>
+
         <div class="modal-actions" style="margin-top: 12px">
           <button class="btn btn-primary" id="printMemberBtn"
             >Print This Member</button
@@ -1340,9 +1387,14 @@
         return `${y}-${String(m + 1).padStart(2, "0")}`;
       }
       function ensureMonthData(emp, key) {
-        if (!emp.months[key]) emp.months[key] = { vac: [], sick: [], abs: [] };
-        return emp.months[key];
+        if (!emp.months[key])
+          emp.months[key] = { vac: [], sick: [], abs: [], plan: [] };
+        // Back-compat for older saved months
+        const md = emp.months[key];
+        if (!Array.isArray(md.plan)) md.plan = [];
+        return md;
       }
+
       function monthName(y, m) {
         return (
           new Date(y, m, 1).toLocaleString(undefined, { month: "long" }) +
@@ -1392,6 +1444,30 @@
         };
         return { used, limits: lim, remaining };
       }
+      // Count "planned vacation" in the fiscal year (informational only)
+      function fyPlannedCount(emp, startYear) {
+        let p = 0;
+        fiscalMonths(startYear).forEach(([yy, mm]) => {
+          const md = ensureMonthData(emp, monthKey(yy, mm));
+          p += md.plan.length;
+        });
+        return p;
+      }
+
+      // Is a (y,m,day) inside the *current* fiscal year (that includes "today")?
+      function isInCurrentFY(y, m, day) {
+        const today = new Date();
+        const curFYStart = fiscalStartYearFor(
+          today.getFullYear(),
+          today.getMonth()
+        );
+        // FY months included:
+        const months = new Set(
+          fiscalMonths(curFYStart).map(([Y, M]) => `${Y}-${M}`)
+        );
+        return months.has(`${y}-${m}`);
+      }
+
       function ensureOrderIntegrity() {
         const cur = Array.isArray(state.employeeOrder)
           ? state.employeeOrder
@@ -1531,6 +1607,18 @@
               });
               chips.appendChild(c);
             }
+            // Planned (faded)
+            if (md.plan.includes(day)) {
+              const c = document.createElement("span");
+              c.className = "chip plan";
+              c.textContent = name;
+              c.title = `${name} — Planned Vacation`;
+              c.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                openMemberModal(name);
+              });
+              chips.appendChild(c);
+            }
           });
 
           // Holiday mark + tag
@@ -1625,6 +1713,9 @@
       const assignSickBtn = document.getElementById("assignSick");
       const assignAbsBtn = document.getElementById("assignAbsent");
       const clearBtn = document.getElementById("clearDay");
+      const assignPlannedBtn = document.getElementById("assignPlanned");
+      const modalPlannedNote = document.getElementById("modalPlannedNote");
+
       document.getElementById("closeModal").onclick = () =>
         (modal.style.display = "none");
       document.getElementById("assignModalX").onclick = () =>
@@ -1638,15 +1729,53 @@
         selectedDay = day;
         modalTitle.textContent = `Assign ${selectedEmployee} — ${monthTitleEl.textContent} ${day}`;
         assignAbsBtn.textContent = state.absentLabel;
+
+        // FY planned count for the selected employee
+        const { year: y, month: m } = state.current;
+        const fyStart = fiscalStartYearFor(y, m);
+        const emp = state.employees[selectedEmployee];
+        const plannedFY = fyPlannedCount(emp, fyStart);
+        if (modalPlannedNote)
+          modalPlannedNote.textContent = `Planned (FY): ${plannedFY}`;
+
         modal.style.display = "flex";
       }
+
+      assignPlannedBtn.onclick = () => {
+        const y = state.current.year,
+          m = state.current.month,
+          d = selectedDay;
+        if (!isInCurrentFY(y, m, d)) {
+          alert(
+            "Planned Vacation can only be added within the current Fiscal Year."
+          );
+          return;
+        }
+        const key = monthKey(y, m);
+        const emp = state.employees[selectedEmployee];
+        const md = ensureMonthData(emp, key);
+        // de-dup: remove from official buckets for the *day* (planned is exclusive per day)
+        md.vac = md.vac.filter((x) => x !== d);
+        md.sick = md.sick.filter((x) => x !== d);
+        md.abs = md.abs.filter((x) => x !== d);
+        if (!md.plan.includes(d)) md.plan.push(d);
+        md.plan.sort((a, b) => a - b);
+        modal.style.display = "none";
+        renderCalendar();
+        renderEmployees();
+        saveState();
+      };
+
       function assignDay(kind) {
         const key = monthKey(state.current.year, state.current.month);
         const emp = state.employees[selectedEmployee];
         const md = ensureMonthData(emp, key);
+        // Remove from every other bucket (ensures exclusivity)
         md.vac = md.vac.filter((d) => d !== selectedDay);
         md.sick = md.sick.filter((d) => d !== selectedDay);
         md.abs = md.abs.filter((d) => d !== selectedDay);
+        md.plan = md.plan.filter((d) => d !== selectedDay);
+        // Add to requested bucket
         md[kind].push(selectedDay);
         md[kind].sort((a, b) => a - b);
         modal.style.display = "none";
@@ -1654,6 +1783,7 @@
         renderEmployees();
         saveState();
       }
+
       assignVacBtn.onclick = () => assignDay("vac");
       assignSickBtn.onclick = () => assignDay("sick");
       assignAbsBtn.onclick = () => assignDay("abs");
@@ -1664,6 +1794,7 @@
         md.vac = md.vac.filter((d) => d !== selectedDay);
         md.sick = md.sick.filter((d) => d !== selectedDay);
         md.abs = md.abs.filter((d) => d !== selectedDay);
+        md.plan = md.plan.filter((d) => d !== selectedDay);
         modal.style.display = "none";
         renderCalendar();
         renderEmployees();
@@ -1699,6 +1830,7 @@
       const memberModalX = document.getElementById("memberModalX");
       const closeMemberModalBtn = document.getElementById("closeMemberModal");
       const printMemberBtn = document.getElementById("printMemberBtn");
+      const msPlanFY = document.getElementById("msPlanFY");
       let memberModalCurrentName = null;
 
       function openMemberModal(name) {
@@ -1706,6 +1838,8 @@
         const fyStart = fiscalStartYearFor(y, m);
         const emp = state.employees[name];
         const sums = fySums(emp, fyStart);
+        const plannedFY = fyPlannedCount(emp, fyStart);
+        if (msPlanFY) msPlanFY.textContent = `${plannedFY} planned (FY)`;
         memberModalCurrentName = name;
         memberModalTitle.textContent = `Member Stats — ${name}`;
         memberModalMonth.textContent = fiscalHeader(fyStart);
@@ -2694,6 +2828,8 @@
     </script>
   </body>
 </html>
+
+
 
 
 
