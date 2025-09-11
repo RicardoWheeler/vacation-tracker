@@ -871,11 +871,29 @@
           height: 240px;
         }
       }
+    
+      /* Brand logo (switches by theme) */
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .brand img {
+        height: 34px; /* resize for clear visibility in header */
+        width: auto;
+        display: block;
+      }
+      /* Show purple logo in light theme; white logo in dark theme */
+      :root[data-theme="light"] .brand .logo-light { display: block; }
+      :root[data-theme="light"] .brand .logo-dark { display: none; }
+      :root[data-theme="dark"] .brand .logo-light { display: none; }
+      :root[data-theme="dark"] .brand .logo-dark { display: block; }
+
     </style>
   </head>
   <body>
     <header>
-      <h1>📅 Vacation Tracker</h1>
+      <div class="brand"><img class="logo-light" src="logo-white.png" alt="Vacation Tracker logo (light theme)"><img class="logo-dark" src="logo-white.png" alt="Vacation Tracker logo (dark theme)"></div>
       <div class="controls">
         <button class="btn btn-ghost" id="renameAbsentBtn"
           >Rename “Absent”</button
@@ -2903,6 +2921,33 @@
     </script>
   </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
